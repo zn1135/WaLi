@@ -1,0 +1,37 @@
+# Build artifacts
+cmake-build-*/
+build/
+out/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+*.ninja
+.ninja_*
+
+# Firmware outputs
+*.elf
+*.map
+*.hex
+*.bin
+*.o
+*.obj
+*.d
+*.a
+*.lib
+*.lst
+
+# IDE settings
+.idea/
+.vscode/
+
+# OS and editor temp files
+*.log
+*.tmp
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
