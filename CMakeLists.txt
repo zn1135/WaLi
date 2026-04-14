@@ -75,6 +75,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         IMCA/Judge/ui_picTask.c
         IMCA/Judge/UI.c
         IMCA/Judge/UI.h
+        IMCA/Tool/VBatSense.c
+        IMCA/Tool/adc_handle.c
 
 )
 

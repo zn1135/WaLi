@@ -11,7 +11,7 @@ set(IMCALIB_Include_Dirs
 
 )
 
-file(GLOB_RECURSE IMCALIB_Application_Src
+file(GLOB_RECURSE IMCALIB_Application_Src CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/Judge/*.c
         ${CMAKE_CURRENT_SOURCE_DIR}/Task/*.c
         ${CMAKE_CURRENT_SOURCE_DIR}/Tool/*.c

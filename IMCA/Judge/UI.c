@@ -90,7 +90,7 @@ void UI_ALL_Task(void)
     //     last_bullet = 0;
     //     now_bullet = 0;
     //     Rec_bullet_remaining.bullet_remaining_num_17mm = 0;
-    //     add_bullet = 0;
+    //     add_bullet = 0;·
     // }
 
 
@@ -181,7 +181,9 @@ void UI_INFANTRY_Task(void)
         UI_TEST_Character('F',1341,774,0x30,1);
         UI_TEST_Character('G',1396,774,0x31,1);
         UI_TEST_Character('B',1451,774,0x32,1);
-
+        UI_TEST_Character('H',1341,400,0x33,1);
+        UI_TEST_Character('M',1396,400,0x34,1);
+        UI_TEST_Character('L',1451,400,0x35,1);
         UI_TEST_Character_BULLET(1);
     }
 

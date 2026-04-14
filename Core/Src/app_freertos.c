@@ -230,7 +230,7 @@ void InteractTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-
+    //
 
     MotorCanSendCurrent();
     static uint8_t _cnt=0;
@@ -260,6 +260,7 @@ void ResetTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
+    MotorWatchdogMonitor();
     UI_ALL_Task();
     if (KEY_CTRL+KEY_R) {
       ALL_reset(0);

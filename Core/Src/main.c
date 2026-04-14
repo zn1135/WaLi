@@ -19,10 +19,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "adc.h"
 #include "dma.h"
 #include "fdcan.h"
-#include "tim.h"
 #include "usart.h"
+#include "tim.h"
 #include "usb_device.h"
 #include "gpio.h"
 
@@ -103,6 +104,9 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   MX_TIM4_Init();
+  MX_LPUART1_UART_Init();
+  MX_ADC3_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */

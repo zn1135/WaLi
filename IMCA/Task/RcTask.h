@@ -2,70 +2,107 @@
 #define __RC_TASK
 
 #include "stm32g4xx_hal.h"
-
+extern uint8_t RC_TimeOut_Flag;
+extern uint8_t RC_TimeOut_cnt;
 #define RC_CONTROL_ENABLE   /*ң��������ʹ�ܺ궨��*/
 
 #define RC_BUFFER_SIZE 150
 #define RC_Frame_Lentgh		18
 
 /*��ֵ*/
-#define KEY_W 				((uint16_t)1 << 0)&remote_control.keyBoard.key_code
-#define KEY_S 				((uint16_t)1 << 1)&remote_control.keyBoard.key_code 
-#define KEY_A 				((uint16_t)1 << 2)&remote_control.keyBoard.key_code
-#define KEY_D 				((uint16_t)1 << 3)&remote_control.keyBoard.key_code
-#define KEY_SHIFT 			((uint16_t)1 << 4)&remote_control.keyBoard.key_code
-#define KEY_CTRL 			((uint16_t)1 << 5)&remote_control.keyBoard.key_code
-#define KEY_Q 				((uint16_t)1 << 6)&remote_control.keyBoard.key_code
-#define KEY_E 				((uint16_t)1 << 7)&remote_control.keyBoard.key_code
-#define KEY_R 				((uint16_t)1 << 8)&remote_control.keyBoard.key_code
-#define KEY_F 				((uint16_t)1 << 9)&remote_control.keyBoard.key_code
-#define KEY_G 				((uint16_t)1 << 10)&remote_control.keyBoard.key_code
-#define KEY_Z 				((uint16_t)1 << 11)&remote_control.keyBoard.key_code
-#define KEY_X 				((uint16_t)1 << 12)&remote_control.keyBoard.key_code
-#define KEY_C 				((uint16_t)1 << 13)&remote_control.keyBoard.key_code
-#define KEY_V 				((uint16_t)1 << 14)&remote_control.keyBoard.key_code
-#define KEY_B 				((uint16_t)1 << 15)&remote_control.keyBoard.key_code
+#define RC_KEY_CODE             ((RC_TimeOut_Flag == 0U) ? (remote_control.keyBoard.key_code) : (VT_control.keyBoard.key_code))
+#define KEY_W                   ((((uint16_t)1U << 0) & (RC_KEY_CODE)))
+#define KEY_S                   ((((uint16_t)1U << 1) & (RC_KEY_CODE)))
+#define KEY_A                   ((((uint16_t)1U << 2) & (RC_KEY_CODE)))
+#define KEY_D                   ((((uint16_t)1U << 3) & (RC_KEY_CODE)))
+#define KEY_SHIFT               ((((uint16_t)1U << 4) & (RC_KEY_CODE)))
+#define KEY_CTRL                ((((uint16_t)1U << 5) & (RC_KEY_CODE)))
+#define KEY_Q                   ((((uint16_t)1U << 6) & (RC_KEY_CODE)))
+#define KEY_E                   ((((uint16_t)1U << 7) & (RC_KEY_CODE)))
+#define KEY_R                   ((((uint16_t)1U << 8) & (RC_KEY_CODE)))
+#define KEY_F                   ((((uint16_t)1U << 9) & (RC_KEY_CODE)))
+#define KEY_G                   ((((uint16_t)1U << 10) & (RC_KEY_CODE)))
+#define KEY_Z                   ((((uint16_t)1U << 11) & (RC_KEY_CODE)))
+#define KEY_X                   ((((uint16_t)1U << 12) & (RC_KEY_CODE)))
+#define KEY_C                   ((((uint16_t)1U << 13) & (RC_KEY_CODE)))
+#define KEY_V                   ((((uint16_t)1U << 14) & (RC_KEY_CODE)))
+#define KEY_B                   ((((uint16_t)1U << 15) & (RC_KEY_CODE)))
+
+#define CH1                    ((RC_TimeOut_Flag == 0U) ? (remote_control.ch1) : (VT_control.ch1))
+#define CH2                    ((RC_TimeOut_Flag == 0U) ? (remote_control.ch2) : (VT_control.ch2))
+#define CH3                    ((RC_TimeOut_Flag == 0U) ? (remote_control.ch3) : (VT_control.ch4))
+#define CH4                    ((RC_TimeOut_Flag == 0U) ? (remote_control.ch4) : (VT_control.ch3))
+#define CH5                    ((RC_TimeOut_Flag == 0U) ? (remote_control.ch5) : (VT_control.ch5))
+
+#define MOUSE_X                ((RC_TimeOut_Flag == 0U) ? (remote_control.mouse.x) : (VT_control.mouse.x))
+#define MOUSE_Y                ((RC_TimeOut_Flag == 0U) ? (remote_control.mouse.y) : (VT_control.mouse.y))
+#define MOUSE_Z                ((RC_TimeOut_Flag == 0U) ? (remote_control.mouse.z) : (VT_control.mouse.z))
+#define MOUSE_PRESS_LEFT       ((RC_TimeOut_Flag == 0U) ? (remote_control.mouse.press_left) : (VT_control.mouse.press_left))
+#define MOUSE_PRESS_RIGHT      ((RC_TimeOut_Flag == 0U) ? (remote_control.mouse.press_right) : (VT_control.mouse.press_right))
 
 /*ң�������Ϸ������Ϸ�����������״̬*/
-#define  RC_UPPER_LEFT_SW_UP     (remote_control.switch_left == Switch_Up)
-#define  RC_UPPER_LEFT_SW_MID    (remote_control.switch_left == Switch_Middle)     
-#define  RC_UPPER_LEFT_SW_DOWN   (remote_control.switch_left == Switch_Down)
-#define  RC_UPPER_RIGHT_SW_UP    (remote_control.switch_right == Switch_Up)
-#define  RC_UPPER_RIGHT_SW_MID   (remote_control.switch_right == Switch_Middle)
-#define  RC_UPPER_RIGHT_SW_DOWN  (remote_control.switch_right == Switch_Down)
+
+#define  RC_UPPER_LEFT_SW_UP    ((RC_TimeOut_Flag == 0U) ? (remote_control.switch_left == Switch_Up) : (VT_control._switch == VT_S))
+#define  RC_UPPER_LEFT_SW_MID   ((RC_TimeOut_Flag == 0U) ? (remote_control.switch_left == Switch_Middle) : (VT_control._switch == VT_N))
+#define  RC_UPPER_LEFT_SW_DOWN  ((RC_TimeOut_Flag == 0U) ? (remote_control.switch_left == Switch_Down) : (VT_control._switch == VT_C))
+#define  RC_UPPER_RIGHT_SW_UP   ((RC_TimeOut_Flag == 0U) ? (remote_control.switch_right == Switch_Up) : (VT_control.Trigger_key == 1U))
+#define  RC_UPPER_RIGHT_SW_MID  ((RC_TimeOut_Flag == 0U) ? (remote_control.switch_right == Switch_Middle) : (VT_control.Custom_rightKey == 1U))
+#define  RC_UPPER_RIGHT_SW_DOWN ((RC_TimeOut_Flag == 0U) ? (remote_control.switch_right == Switch_Down) : (VT_control.Custom_leftKey == 1U))
+
 
 
 typedef struct {
-	int16_t ch1;	//each ch value from -364 -- +364
+	int16_t ch1;	// each ch value from -364 -- +364
 	int16_t ch2;
 	int16_t ch3;
 	int16_t ch4;
-  int16_t ch5;
-	
-	uint8_t switch_left;	//3 value
+	int16_t ch5;
+
+	uint8_t switch_left;	// 3 value
 	uint8_t switch_right;
-	
+
 	struct {
 		int16_t x;
 		int16_t y;
 		int16_t z;
-	
+
 		uint8_t press_left;
 		uint8_t press_right;
-	}mouse;
-	
+	} mouse;
+
 	struct {
 		uint16_t key_code;
-/**********************************************************************************
-   * ����ͨ��:15   14   13   12   11   10   9   8   7   6     5     4   3   2   1
-   *          V    C    X	  Z    G    F    R   E   Q  CTRL  SHIFT  D   A   S   W
-************************************************************************************/
+	} keyBoard;
+} RC_Type;
 
-	}keyBoard;
-	
 
-}RC_Type;
+typedef struct {
+	int16_t ch1;	// each ch value from -364 -- +364
+	int16_t ch2;
+	int16_t ch3;
+	int16_t ch4;
+	int16_t ch5;
 
+	uint8_t _switch;	// 3 value
+	uint8_t PauseButton;
+	uint8_t Custom_leftKey;
+	uint8_t Custom_rightKey;
+	uint8_t Trigger_key;
+
+	struct {
+		int16_t x;
+		int16_t y;
+		int16_t z;
+
+		uint8_t press_left;
+		uint8_t press_right;
+		uint8_t press_middle;
+	} mouse;
+
+	struct {
+		uint16_t key_code;
+	} keyBoard;
+} VT_Type;
 
 enum{
 	Switch_Up = 1,
@@ -84,6 +121,9 @@ extern RC_Type remote_control;
 extern uint8_t RC_Buffer[RC_BUFFER_SIZE];
 
 
+extern VT_Type VT_control;
+extern uint8_t VT_RxBuffer[100];
+
 
 typedef struct
 {
@@ -96,6 +136,7 @@ typedef struct
 
 // 按键去抖状态量
 
+void Callback_VT_Handle(VT_Type* vt, uint8_t* buff);
 
 /*遥控接收数据解析*/
 void Callback_RC_Handle(RC_Type* rc, uint8_t* buff);

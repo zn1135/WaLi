@@ -27,36 +27,12 @@ ext_client_custom_graphic_character_t  character;
 
 void ChassisGuidance(uint16_t circle_point_x,uint16_t circle_point_y,uint8_t Radius)  //底盘指向指南针
 {
-    static int8_t direction_x,direction_y;
 
 
 
-    if( -xRelativeAngle.receive_yaw_relative_angle >= 2048)
-    {
-        direction_x = -1;  //1
-        direction_y = 1;  //1
-    }
-    else if(-xRelativeAngle.receive_yaw_relative_angle < 2048 && -xRelativeAngle.receive_yaw_relative_angle >= 0)
-    {
-        direction_x = -1; //-1
-        direction_y = 1;  //1
-    }
+    ui_state.pointer[X_ZHOU] = circle_point_x + Radius * arm_sin_f32(xRelativeAngle.receive_yaw_relative_rad) ;
+    ui_state.pointer[Y_ZHOU] = circle_point_y + Radius * arm_cos_f32(xRelativeAngle.receive_yaw_relative_rad) ;
 
-    if(-xRelativeAngle.receive_yaw_relative_angle <= -2048)
-    {
-        direction_x = -1;  //-1
-        direction_y = 1;   //1
-    }
-    else if(-xRelativeAngle.receive_yaw_relative_angle > -2048 && -xRelativeAngle.receive_yaw_relative_angle <= 0)
-    {
-        direction_x = -1; //1
-        direction_y = 1; //1
-    }
-
-    ui_state.pointer[X_ZHOU] = circle_point_x + Radius * arm_sin_f32(-xRelativeAngle.receive_yaw_relative_angle /4096 * 3.1415926f) * direction_x;
-    ui_state.pointer[Y_ZHOU] = circle_point_y + Radius * arm_cos_f32(-xRelativeAngle.receive_yaw_relative_angle /4096 * 3.1415926f) * direction_y;
-    ui_state.pointer[X_ZHOU] = circle_point_x + Radius * arm_sin_f32(-xRelativeAngle.receive_yaw_relative_angle /4096.f * 3.14f) * direction_x;
-    ui_state.pointer[Y_ZHOU] = circle_point_y + Radius * arm_cos_f32(-xRelativeAngle.receive_yaw_relative_angle /4096.f * 3.14f) * direction_y;
 //
 
 //
@@ -102,34 +78,32 @@ void UI_TEST(uint8_t operate_)
 
 
         /*自瞄框*/
-        if(mouse_right.deshake_key)
+        if (Gimbal_Height_flag==High)
         {
-            Line.interaction_figure[0].color = 4;//紫红色
-            Line.interaction_figure[0].width = 3;//图形线宽
+            Line.interaction_figure[0].start_x = 1348;//图形坐标x
+            Line.interaction_figure[0].start_y = 388;//图坐标y
         }
-        else if(KEY_Z)
+        else if(Gimbal_Height_flag==Middle)
         {
-           Line.interaction_figure[0].color = 3;//橙色
-            Line.interaction_figure[0].width = 3;//图形线宽
+            Line.interaction_figure[0].start_x = 1403;//图形坐标x
+            Line.interaction_figure[0].start_y = 388;//图坐标y
+        }
+        else if(Gimbal_Height_flag==Low) {
+            Line.interaction_figure[0].start_x = 1460;//图形坐标x
+            Line.interaction_figure[0].start_y = 388;//图坐标y
+        }
 
-        }
-        else
-        {
-            Line.interaction_figure[0].color = 8;//白色
-            Line.interaction_figure[0].width = 1;//图形线宽
-        }
         Line.interaction_figure[0].figure_name[0] = 0x70;//名字是为了区分图片内容
         Line.interaction_figure[0].operate_tpye =  operate_ ;//增加图形
-        Line.interaction_figure[0].figure_tpye =  1; //矩形
+        Line.interaction_figure[0].figure_tpye =  2; //圆
         Line.interaction_figure[0].layer = 7;//图层 7
-//	Line.interaction_figure[0].color = 8;//白色
-//	Line.interaction_figure[0].width = 2;//图形线宽
-        Line.interaction_figure[0].start_x = 673;//起点图形坐标x
-        Line.interaction_figure[0].start_y = 360;//起点图坐标y
-//	Line.interaction_figure[0].details_a = 1000;//
-//	Line.interaction_figure[0].details_b = 130;//
-        Line.interaction_figure[0].details_d = 1251;//
-        Line.interaction_figure[0].details_e = 754;//
+        Line.interaction_figure[0].color = 3;//橙色
+        Line.interaction_figure[0].width = 10;//图形线宽
+        //	Line.interaction_figure[4].start_x = 960;//图形坐标x
+        //	Line.interaction_figure[4].start_y = 540;//图坐标y
+        //	Line.interaction_figure[4].details_a = 1000;//
+        //	Line.interaction_figure[4].details_b = 130;//
+        Line.interaction_figure[0].details_c = 30;//
 
 
         /*弹丸数*/
@@ -220,7 +194,7 @@ void UI_TEST(uint8_t operate_)
 //	Line.interaction_figure[4].start_y = 540;//图坐标y
 //	Line.interaction_figure[4].details_a = 1000;//
 //	Line.interaction_figure[4].details_b = 130;//
-        Line.interaction_figure[4].details_c = 27;//
+        Line.interaction_figure[4].details_c = 30;//
 //  Line.interaction_figure[4].details_d = 400;//
 //	Line.interaction_figure[4].details_e = 300;//
 
@@ -314,7 +288,7 @@ void UI_TEST_Character(char V1,uint32_t x ,uint32_t y,uint8_t name ,uint8_t oper
     character.grapic_data_struct.graphic_tpye =  7; //整形->字符
     character.grapic_data_struct.layer = 7;//图层 7
     character.grapic_data_struct.color=3;//橙色
-    character.grapic_data_struct.start_angle  =  30;//字体大小
+    character.grapic_data_struct.start_angle  = 45;//字体大小
 // character.grapic_data_struct.end_angle  =  12;//字体长度
     character.grapic_data_struct.width =3;//线条宽度
     character.grapic_data_struct.start_x =x;

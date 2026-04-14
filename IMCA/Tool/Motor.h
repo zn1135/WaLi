@@ -149,6 +149,8 @@ typedef struct{
 
 // 电机参数结构体定义
 typedef struct motor_param_t{
+    float   Output_ratio;
+    uint8_t   Timeout_Flag;
     int16_t    ID;                          // 电机ID
     char * Name;                            // 电机名称
     motor_type_t  MotorType;             // 电机类型，参数定义见"motor_type_t"

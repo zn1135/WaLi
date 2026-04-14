@@ -1,4 +1,6 @@
 #include "ControlTask.h"
+
+#include "adc_handle.h"
 #include "main.h"
 #include "usart.h"
 #include "user_lib.h"
@@ -21,6 +23,18 @@
 #include "Ramp.h"
 #include "ShootControl.h"
 #include "Vision_interact.h"
+#include "VBatSense.h"
+
+// VBatSense_Config_t cfg = {
+//     .vref_mv = 3300,
+//     .r_top_ohm = 10000,
+//     .r_bottom_ohm = 1000
+// };
+
+
+
+
+
 
 robot_mode_t xRobotMode;
 uint8_t Gimbal_Init_Flag = 0;
@@ -77,6 +91,8 @@ static gpio_debounce_state_t *GPIO_FindOrCreateDebounceState(GPIO_TypeDef *GPIOx
     return NULL;
 }
 
+
+
 void TotalInitTask(void) {
     CANFilterInit();
     xRobotMode.CtrlMode = LOSE;
@@ -91,15 +107,17 @@ void TotalInitTask(void) {
     MouseRampInit();
     HAL_UARTEx_ReceiveToIdle_DMA_NoIT(&huart2); /*启动串口空闲中断，用于接收遥控器发来的数据*/
     HAL_UARTEx_ReceiveToIdle_DMA_NoIT(&huart3); /*启动串口空闲中断，用于接收JUDGE发来的数据*/
+    HAL_UARTEx_ReceiveToIdle_DMA_NoIT(&hlpuart1); /*启动串口空闲中断，用于接收VT发来的数据*/
     MotorInit(); //电机参数初始化
     PidInit(); //pid初始化
     const static float chassis_x_order_filter[1] = {CHASSIS_ACCEL_X_NUM};
     const static float chassis_y_order_filter[1] = {CHASSIS_ACCEL_Y_NUM};
     FirstOrderFilterInit(&xChassisCmdSlowSetVx, CHASSIS_CONTROL_TIME, chassis_x_order_filter);
     FirstOrderFilterInit(&xChassisCmdSlowSetVy, CHASSIS_CONTROL_TIME, chassis_y_order_filter);
-
+    // VBatSense_Init(&hadc3, &cfg);
+    ADC_handle_Init();
 }
-
+uint32_t vbat_mv = 0;
 
 void TotalControl(void) {
     // GPIO_Read(GPIOC, GPIO_PIN_9);
@@ -115,8 +133,8 @@ void TotalControl(void) {
     // xMotorParam[PITCH].MeasureImu->palstance = -xMotorParam[PITCH].MeasureDM->velocity;
 #endif
     CtrlModeSelect();
-    FirstOrderFilterCali(&mouse_x, -remote_control.mouse.x*25.0f);//一阶低通滤波
-    FirstOrderFilterCali(&mouse_y, remote_control.mouse.y);//一阶低通滤波
+    FirstOrderFilterCali(&mouse_x, MOUSE_X);//一阶低通滤波
+    FirstOrderFilterCali(&mouse_y, MOUSE_Y);//一阶低通滤波
     // xMotorParam[Leg_RB].MeasureLINK->encoder = (xMotorParam[Leg_RB].MeasureLINK->encoder<3.14)?3.14-xMotorParam[Leg_RB].MeasureLINK->encoder:9.42-xMotorParam[Leg_RB].MeasureLINK->encoder;
     deshake_all();
     TotalControlSetValue();
@@ -130,24 +148,48 @@ void TotalControl(void) {
     //                Chassis_power_buffer()
     // );
 
-//     Vofa_Send_Data8(Gimbal_Height_flag,//0
-//                 xMotorParam[Height].EcoTar, //1
-//                 xRobotMode.ChassisMode , //2
-//                highlow_flag , //3
-//                remote_control.ch5, //4
-//                 Gimbal_Init_Flag, //5
-//                FireSpeed(), //6
-//                RoboHP()
+    // Vofa_Send_Data8(Gimbal_Height_flag,//0
+    //             xMotorParam[Height].EcoTar, //1
+    //             xRobotMode.ChassisMode , //2
+    //            highlow_flag , //3
+    //            remote_control.ch5, //4
+    //             Gimbal_Init_Flag, //5
+    //            mouse_x.out, //6
+    //            remote_control.mouse.x
+    // );xMotorParam[WHEEL_FR].Timeout_Flag
+    //
+    // Vofa_Send_Data16(
+    //     xMotorParam[FRICTR].MeasureEco->speed_rpm, //0
+    //     xMotorParam[FRICTL].MeasureEco->speed_rpm,//1
+    //     FireSpeed(),//2
+    //     VT_control.ch4,//3
+    //     VT_control._switch,//4
+    //     VT_control.PauseButton,//5
+    //     VT_control.Custom_leftKey,//6
+    //     VT_control.Custom_rightKey,//7
+    //     0,//8
+    //     VT_control.Trigger_key,//9
+    //     VT_control.mouse.x,//10
+    //     VT_control.mouse.y,//11
+    //     0,//12
+    //     0,//13
+    //     0,//14
+    //     0//15
+    // );
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_Start(&hadc3);
+//     Vofa_Send_Data8(xRobotMode.ChassisMode,//0
+//                arm_sin_f32(xRelativeAngle.receive_yaw_relative_rad), //1
+//               arm_cos_f32(xRelativeAngle.receive_yaw_relative_rad), //2
+//                 xMotorParam[YAW].ImuTar , //3
+//               KEY_SHIFT&&KEY_C, //4
+//              // highlow_flag, //5
+//               // ABS(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle), //6
+//               // HAL_GetTick(),
+//               hadc1.Instance->DR,
+//               hadc3.Instance->DR,
+//               adc1_value[0]
 // );
-    Vofa_Send_Data8(xMotorParam[YAW].EcoTar,//0
-                xMotorParam[YAW].MeasureDM->position, //1
-               xMotorParam[YAW].TempCalc, //2
-                xMotorParam[YAW].MeasureDM->velocity , //3
-               mouse_x.out, //4
-              -remote_control.mouse.x*25.0f , //5
-               FireSpeed(), //6
-               RoboHP()
-);
     // Vofa_Send_Data8(MiniPC_ReceivePacket.yaw/PI*180 ,//0
     //                 xMotorParam[YAW].MeasureImu->angle, //1
     //                MiniPC_ReceivePacket.yaw_vel/PI*180 , //2
@@ -166,15 +208,25 @@ void TotalControl(void) {
     //                 xMotorParam[PITCH].MeasureDM->velocity, //6
     //                 MiniPC_ReceivePacket.fireflag //7
     // );
-    // Vofa_Send_Data8(Chassis_power(),//0
-    //               power.motor  , //1
-    //               xMotorParam[WHEEL_BL].MeasureEco->real_current  , //2
-    //                   xMotorParam[WHEEL_BL].MeasureEco->speed_rpm, //3
-    //               send_chassis_power_limit(),//4
-    //                 Chassis_Power.pos_out, //5
-    //                 Cap_Measure.cap_value, //6
-    //                 arm_cos_f32(xMotorParam[YAW].MeasureDM->position) //7
-    // );
+    Vofa_Send_Data16(xMotorParam[WHEEL_FR].MeasureEco->speed_rpm,//0
+                    xMotorParam[WHEEL_FL].MeasureEco->speed_rpm  , //1
+                    xMotorParam[WHEEL_BR].MeasureEco->speed_rpm , //2
+                    xMotorParam[WHEEL_BL].MeasureEco->speed_rpm, //3
+                    xMotorParam[WHEEL_FR].EcoTar,//4
+                    xMotorParam[WHEEL_FL].EcoTar, //5
+                    xMotorParam[WHEEL_BR].EcoTar, //6
+                    xMotorParam[WHEEL_BL].EcoTar, //7
+                    xMotorParam[WHEEL_FR].Output_ratio,
+                    xMotorParam[WHEEL_FL].Output_ratio,
+                    xMotorParam[WHEEL_BR].Output_ratio,
+                    xMotorParam[WHEEL_BL].Output_ratio,
+                    xMotorParam[YAW].MeasureDM->position,
+                    xMotorParam[PITCH].MeasureDM->position,
+                    0,
+                    0
+    );
+    //
+
 
 }
 
@@ -184,38 +236,36 @@ void CtrlModeSelect(void) {
         xRobotMode.ChassisMode = CHASSIS_FOLLOW;
         // Gimbal_Init_Flag=0;
     }
-    if (RC_UPPER_LEFT_SW_UP) {
-        xRobotMode.CtrlMode = PC;
-    } else if (RC_UPPER_LEFT_SW_MID) {
-        xRobotMode.CtrlMode = RC;
-    } else if (RC_UPPER_LEFT_SW_DOWN) {
-        xRobotMode.CtrlMode = LOSE;
-    } else;
-
-    if (xRobotMode.CtrlMode == RC) {
-        if (Gimbal_Height_flag==High)
-        {
-            if (RC_UPPER_RIGHT_SW_UP) {
-                xRobotMode.ChassisMode = CHASSIS_SEPARA;
-            } else if (RC_UPPER_RIGHT_SW_MID) {
-                xRobotMode.ChassisMode = CHASSIS_FOLLOW;
-            } else if (RC_UPPER_RIGHT_SW_DOWN) {
-                xRobotMode.ChassisMode = CHASSIS_GYROSC;
-            } else;
-        }else {
-            xRobotMode.ChassisMode = CHASSIS_FOLLOW;
-        }
-
-    } else if (xRobotMode.CtrlMode == PC) {
-        if (RC_UPPER_RIGHT_SW_UP) {
-            xRobotMode.GimbalMode = NOSHOOT_MODE;
-        } else if (RC_UPPER_RIGHT_SW_MID) {
-            xRobotMode.GimbalMode = NORMAL_MODE;
-        } else if (RC_UPPER_RIGHT_SW_DOWN) {
-            xRobotMode.GimbalMode = UNBOUNCE_MODE;
-            xRobotMode.ChassisMode = CHASSIS_SEPARA;
+        if (RC_UPPER_LEFT_SW_UP) {
+            xRobotMode.CtrlMode = PC;
+        } else if (RC_UPPER_LEFT_SW_MID) {
+            xRobotMode.CtrlMode = RC;
+        } else if (RC_UPPER_LEFT_SW_DOWN) {
+            xRobotMode.CtrlMode = LOSE;
         } else;
-    } else;
+        if (xRobotMode.CtrlMode == RC) {
+            if (Gimbal_Height_flag==High)
+            {
+                if (RC_UPPER_RIGHT_SW_UP) {
+                    xRobotMode.ChassisMode = CHASSIS_SEPARA;
+                } else if (RC_UPPER_RIGHT_SW_MID) {
+                    xRobotMode.ChassisMode = CHASSIS_FOLLOW;
+                } else if (RC_UPPER_RIGHT_SW_DOWN) {
+                    xRobotMode.ChassisMode = CHASSIS_GYROSC;
+                } else;
+            }else {
+                xRobotMode.ChassisMode = CHASSIS_FOLLOW;
+            }
+        } else if (xRobotMode.CtrlMode == PC) {
+            if (RC_UPPER_RIGHT_SW_UP) {
+                xRobotMode.GimbalMode = NOSHOOT_MODE;
+            } else if (RC_UPPER_RIGHT_SW_MID) {
+                xRobotMode.GimbalMode = NORMAL_MODE;
+            } else if (RC_UPPER_RIGHT_SW_DOWN) {
+                xRobotMode.GimbalMode = UNBOUNCE_MODE;
+                xRobotMode.ChassisMode = CHASSIS_SEPARA;
+            } else;
+        } else;
 }
 
 

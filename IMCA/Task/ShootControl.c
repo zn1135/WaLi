@@ -69,8 +69,14 @@ void SelectJudgeSpeed()     //Data selection for referees system
         }
         else
         {
-        	xMotorParam[FRICTR].EcoTar = -Set_Shoot_Speed * 19.2f;
-        	xMotorParam[FRICTL].EcoTar = Set_Shoot_Speed * 19.2f;
+        	if (Gimbal_Height_flag!=Low) {
+        		xMotorParam[FRICTR].EcoTar = -Set_Shoot_Speed * 19.2f;
+        		xMotorParam[FRICTL].EcoTar = Set_Shoot_Speed * 19.2f;
+        	}else
+        	{
+        		xMotorParam[FRICTR].EcoTar = 0;
+        		xMotorParam[FRICTL].EcoTar = 0;
+        	}
         }
 
     }
@@ -119,85 +125,85 @@ void PluckControl()
 	if (xRobotMode.CtrlMode == LOSE||xRobotMode.CtrlMode == RC) {
 		xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
 		xMotorParam[PLUCK].EcoTar = 0;
-	}else if(xRobotMode.CtrlMode == PC && RC_UPPER_RIGHT_SW_DOWN)//  && heat_flag == 0
+	}else if(xRobotMode.CtrlMode == PC && RC_UPPER_RIGHT_SW_DOWN)
 	{
         xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
         xMotorParam[PLUCK].EcoTar = 3000;
 	}
-	else if(xRobotMode.CtrlMode == PC&& !RC_UPPER_RIGHT_SW_UP)//  && heat_flag == 0
-	{
-//        press_cnt++;//计数器
-		if(mouse_right.deshake_key&&MiniPC_ReceivePacket.fireflag == 2)
-		{
-			ShootPluck_Fire();
-			// xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
-			// xMotorParam[PLUCK].EcoTar =MaxShootSpeed;//Robot_level()
-		}
-		else if (KEY_V&&MiniPC_ReceivePacket.fireflag == 2) {
-			xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
-			//                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
-			xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle + (8192*36/8);
-		}
-		else if(!mouse_left.deshake_key&&mouse_right.deshake_key&&MiniPC_ReceivePacket.fireflag != 2)
-		{
-			xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
-			xMotorParam[PLUCK].EcoTar = 0;
-		}
-		else
-		{
-			if(mouse_left.deshake_key)
+	else if(xRobotMode.CtrlMode == PC&& !RC_UPPER_RIGHT_SW_UP) {
+		//        press_cnt++;//计数器
+		if (Gimbal_Height_flag!=Low) {
+			if(mouse_right.deshake_key&&MiniPC_ReceivePacket.fireflag == 2)
 			{
+				ShootPluck_Fire();
+				// xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+				// xMotorParam[PLUCK].EcoTar =MaxShootSpeed;//Robot_level()
+			}
+			else if (KEY_V&&MiniPC_ReceivePacket.fireflag == 2) {
+				xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
+				//                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
+				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle + (8192*36/8);
+			}
+			else if(!mouse_left.deshake_key&&mouse_right.deshake_key&&MiniPC_ReceivePacket.fireflag != 2)
+			{
+				xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+				xMotorParam[PLUCK].EcoTar = 0;
+			}
+			else
+			{
+				if(mouse_left.deshake_key)
+				{
 
 					held_cnt++;//按下自动计数
 					if(held_cnt > 300)//按下时间
 					{
-							//连发
-							ShootPluck_Fire();
-							// xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
-							// //   xMotorParam[PLUCK].EcoTar = 660.0f*0+4400;//Robot_level()
-							// xMotorParam[PLUCK].EcoTar = 3000;
+						//连发
+						ShootPluck_Fire();
+						// xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+						// //   xMotorParam[PLUCK].EcoTar = 660.0f*0+4400;//Robot_level()
+						// xMotorParam[PLUCK].EcoTar = 3000;
 					}
+				}
+				else
+				{
+					if(held_cnt >10&&held_cnt <=300)//单发
+					{
+						ShootPluck_Fire();
+						held_cnt=0;
+						// xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
+						// //                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
+						// xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle + (8192*36/8);
+
+					}else{
+
+						held_cnt=0;
+					}
+				}
+			}
+			if(xMotorParam[PLUCK].CloseLoopMode == SpdClsloop && held_cnt == 0 && mouse_right.deshake_key == 0)
+			{
+				xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+				xMotorParam[PLUCK].EcoTar = 0;
+			}
+		}else
+		{
+			if(xMotorParam[PLUCK].CloseLoopMode == SpdClsloop)
+			{
+				xMotorParam[PLUCK].EcoTar = 0;
 			}
 			else
 			{
-				if(held_cnt >10&&held_cnt <=300)//单发
-				{
-					ShootPluck_Fire();
-					held_cnt=0;
-					// xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
-					// //                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
-					// xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle + (8192*36/8);
-
-				}else{
-
-					held_cnt=0;
-				}
+				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle;
 			}
 		}
-		if(xMotorParam[PLUCK].CloseLoopMode == SpdClsloop && held_cnt == 0 && mouse_right.deshake_key == 0)
+		if(abs(xMotorParam[PLUCK].CurrentOutput) > 8000)
 		{
-				xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
-				xMotorParam[PLUCK].EcoTar = 0;
-		}
-	}else
-	{
-        if(xMotorParam[PLUCK].CloseLoopMode == SpdClsloop)
-        {
-            xMotorParam[PLUCK].EcoTar = 0;
-        }
-        else
-        {
-            xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle;
-        }
-    }
-	if(abs(xMotorParam[PLUCK].CurrentOutput) > 8000)
-		{
-			Stuck_Bullet_cnt ++;
+			// Stuck_Bullet_cnt ++;
 			if(Stuck_Bullet_cnt >200)
 			{
 				Stuck_Bullet_falg = 1;
 				xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
-//				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle - 36864;8192*36*2.5/9
+				//				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle - 36864;8192*36*2.5/9
 				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle - 8192*36*2.5/9/2;
 				Stuck_Bullet_cnt = 0;
 			}
@@ -207,6 +213,10 @@ void PluckControl()
 			Stuck_Bullet_cnt = 0;
 			Stuck_Bullet_falg = 0;
 		}
+	}else {
+		xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+		xMotorParam[PLUCK].EcoTar = 0;
+	}
 
 
 //		shoot_heat();

@@ -205,6 +205,7 @@ void set_link_motor_iq(FDCAN_HandleTypeDef *hcan, uint16_t id, int16_t iq) {
 }
 
 void GetMotorMeasureNew(motor_param_t *motor_param, const uint8_t can_rx_data[]) {
+    motor_param->Timeout_Flag++;
     switch (motor_param->MotorType) {
         case DJI:
             motor_param->MeasureEco->last_angle = motor_param->MeasureEco->angle;
@@ -272,9 +273,10 @@ void MotorCanSendCurrent(void) {
             set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[PITCH].ID, 0,0,0,0.2,-1.2*ABS(arm_cos_f32(xMotorParam[PITCH].MeasureDM->position))+xMotorParam[PITCH].CurrentOutput);
         }
         if (xMotorParam[PITCH].MeasureDM->ERROR==1&&xMotorParam[YAW].MeasureDM->ERROR==1) {
-            SetCanFronMotorValue(&hfdcan1, xMotorParam[WHEEL_FR].CurrentOutput,  xMotorParam[WHEEL_FL].CurrentOutput,  xMotorParam[WHEEL_BR].CurrentOutput,  xMotorParam[WHEEL_BL].CurrentOutput);
-            // SetCanFronMotorValue(&hfdcan1, 0, 0, 0 , xMotorParam[WHEEL_BL].CurrentOutput  );
-
+            if (Motor_TimeOut_flag==0) {
+                SetCanFronMotorValue(&hfdcan1, xMotorParam[WHEEL_FR].CurrentOutput,  xMotorParam[WHEEL_FL].CurrentOutput,  xMotorParam[WHEEL_BR].CurrentOutput,  xMotorParam[WHEEL_BL].CurrentOutput);
+            }
+                // SetCanFronMotorValue(&hfdcan1, 0, 0, 0 , xMotorParam[WHEEL_BL].CurrentOutput  );
             SetCanBackMotorValue(&hfdcan2, xMotorParam[Height].CurrentOutput,xMotorParam[FRICTR].CurrentOutput,xMotorParam[FRICTL].CurrentOutput,xMotorParam[PLUCK].CurrentOutput);
         }
         // SetCanFronMotorValue(&hfdcan1,0 ,  0,  0,  xMotorParam[WHEEL_BL].CurrentOutput);
@@ -321,8 +323,10 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rx_header, rx_data);
 
     if (hfdcan->Instance == FDCAN1) {
+
         switch (rx_header.Identifier) {
             case WHEEL_FR_ID:
+
                 GetMotorMeasureNew(&xMotorParam[WHEEL_FR], rx_data);
                 break;
             case WHEEL_FL_ID:
@@ -342,7 +346,10 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 break;
             case YAW_ID:
                 GetMotorMeasureNew(&xMotorParam[YAW], rx_data);
-                xMotorParam[YAW].MeasureDM->velocity+=0.007326f;
+
+                // xMotorParam[YAW].MeasureDM->velocity+=0.007326f;
+                xMotorParam[YAW].MeasureDM->velocity= IMU_Yaw.speed_gyro;
+                xMotorParam[YAW].MeasureDM->position= xMotorParam[YAW].MeasureDM->position/PI*180;
                 break;
             case CAP_ID:
                 GetCapMeasure(&Cap_Measure,rx_data);

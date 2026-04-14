@@ -75,8 +75,8 @@ void PowertotalLimit(void)
     for (int i = 0; i < 4; i++)
     {
 
-    model[i].real_current = averageFilter(i, xMotorParam[i + WHEEL_FR].MeasureEco->real_current);
-    power.motor += PowerMotorLimit(&model[i], &xMotorParam[i + WHEEL_FR]);
+        model[i].real_current = averageFilter(i, xMotorParam[i + WHEEL_FR].MeasureEco->real_current);
+        power.motor += PowerMotorLimit(&model[i], &xMotorParam[i + WHEEL_FR]);
     }
     //
     // 超级电容功率与总功率
@@ -105,9 +105,20 @@ void PowertotalLimit(void)
     }
     else
     {
-    xMotorParam[WHEEL_FR].CurrentOutput = xMotorParam[WHEEL_FR].PidParamSpdEco->pos_out * Chassis_Power.pos_out*1.05;
+//         xMotorParam[WHEEL_FR].MeasureEco->speed_rpm,//0
+// xMotorParam[WHEEL_FL].MeasureEco->speed_rpm  , //1
+// xMotorParam[WHEEL_BR].MeasureEco->speed_rpm , //2
+// xMotorParam[WHEEL_BL].MeasureEco->speed_rpm, //3
+// xMotorParam[WHEEL_FR].EcoTar,//4
+// xMotorParam[WHEEL_FL].EcoTar, //5
+// xMotorParam[WHEEL_BR].EcoTar, //6
+// xMotorParam[WHEEL_BL].EcoTar //7
+
+
+
+    xMotorParam[WHEEL_FR].CurrentOutput = xMotorParam[WHEEL_FR].PidParamSpdEco->pos_out * Chassis_Power.pos_out;
     xMotorParam[WHEEL_FL].CurrentOutput = xMotorParam[WHEEL_FL].PidParamSpdEco->pos_out * Chassis_Power.pos_out;
     xMotorParam[WHEEL_BL].CurrentOutput = xMotorParam[WHEEL_BL].PidParamSpdEco->pos_out * Chassis_Power.pos_out;
-    xMotorParam[WHEEL_BR].CurrentOutput = xMotorParam[WHEEL_BR].PidParamSpdEco->pos_out * Chassis_Power.pos_out*0.95;
+    xMotorParam[WHEEL_BR].CurrentOutput = xMotorParam[WHEEL_BR].PidParamSpdEco->pos_out * Chassis_Power.pos_out;
     }
 }

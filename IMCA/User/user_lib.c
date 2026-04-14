@@ -6,6 +6,7 @@
 
 #include "ChassisControl.h"
 #include "ControlTask.h"
+#include "GimbalControl.h"
 #include "RcTask.h"
 #include "Motor.h"
 #include "Ramp.h"
@@ -17,6 +18,8 @@ uint8_t yaw_flag;
 uint8_t RB_Color=0;
 uint8_t RoboHP_flag;
 uint8_t yaw_position[4];
+float Gimbal_FOLLOWANGLE = Gimbal_FrontAngle;
+uint8_t Motor_TimeOut_flag = 0;
 /**
  * @brief 角度限制函数
  *
@@ -263,3 +266,65 @@ void relative_angle_processing(motor_param_t * ptr)
 
 }
 
+void GetGimbalFrontBackOrientation(motor_param_t * ptr) {
+	if (ptr->MeasureDM->position > 0.0f && ptr->MeasureDM->position < 180.0f) {
+		if (highlow_flag==0) {
+			Gimbal_FOLLOWANGLE =Gimbal_FrontAngle;
+		}
+		xRelativeAngle.gimbal_direction=1;
+	} else {
+		if (highlow_flag==0) {
+			Gimbal_FOLLOWANGLE = Gimbal_backAngle;
+		}
+		xRelativeAngle.gimbal_direction=-1;
+	}
+}
+
+
+void MotorWatchdogMonitor() {
+	if (xMotorParam[WHEEL_FR].Timeout_Flag>20&&xMotorParam[WHEEL_FL].Timeout_Flag>20&&xMotorParam[WHEEL_BR].Timeout_Flag>20&&xMotorParam[WHEEL_BL].Timeout_Flag>20) {
+		Motor_TimeOut_flag=0;
+	}else {
+		Motor_TimeOut_flag=1;
+	}
+	xMotorParam[WHEEL_FR].Timeout_Flag=0;
+	xMotorParam[WHEEL_FL].Timeout_Flag=0;
+	xMotorParam[WHEEL_BR].Timeout_Flag=0;
+	xMotorParam[WHEEL_BR].Timeout_Flag=0;
+
+	static uint8_t cnt_=0;
+	if(cnt_++ > 10) {
+		if (RC_TimeOut_cnt > 20) {
+			RC_TimeOut_Flag=0;
+		}else {
+			RC_TimeOut_Flag=1;
+		}
+		RC_TimeOut_cnt=0;
+		cnt_=0;
+	}
+
+}
+
+
+
+
+void Getreceive_yaw_relative_angle(motor_param_t * ptr) {
+	if (Gimbal_Height_flag==High) {
+		xRelativeAngle.receive_yaw_relative_rad =(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle)/180*PI;
+		while (xRelativeAngle.receive_yaw_relative_rad > PI) {
+			xRelativeAngle.receive_yaw_relative_rad -= (2 * PI);
+		}
+		while (xRelativeAngle.receive_yaw_relative_rad <= (-PI)) {
+			xRelativeAngle.receive_yaw_relative_rad += (2 * PI);
+		}
+	}else {
+		xRelativeAngle.receive_yaw_relative_rad =(xMotorParam[YAW].ImuTar-xMotorParam[YAW].MeasureImu->total_angle)/180*PI;
+		while (xRelativeAngle.receive_yaw_relative_rad > PI) {
+			xRelativeAngle.receive_yaw_relative_rad -= (2 * PI);
+		}
+		while (xRelativeAngle.receive_yaw_relative_rad <= (-PI)) {
+			xRelativeAngle.receive_yaw_relative_rad += (2 * PI);
+		}
+	}
+
+}

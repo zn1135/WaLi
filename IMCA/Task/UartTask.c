@@ -10,6 +10,9 @@
 #include "ControlTask.h"
 #include "Judge_interact.h"
 
+
+
+
 /**********************************************************************************************************************
  * @brief  启动串口空闲中断,在初始化时调用
  * @param  UART_HandleTypeDef *huart   UART handle Structure
@@ -48,6 +51,8 @@ HAL_StatusTypeDef HAL_UARTEx_ReceiveToIdle_DMA_NoIT(UART_HandleTypeDef *huart)
     {
         statu = HAL_UARTEx_ReceiveToIdle_DMA(&huart3, judge_RxBuffer, sizeof(judge_RxBuffer));
         __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
+    }else if (huart == &hlpuart1) {
+        statu = HAL_UARTEx_ReceiveToIdle_DMA(&hlpuart1, VT_RxBuffer, sizeof(VT_RxBuffer));
     }
     return statu;
 
@@ -76,6 +81,10 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         HAL_UARTEx_ReceiveToIdle_DMA(&huart3,judge_RxBuffer,sizeof(judge_RxBuffer));		// 重新使能串口5接收中断
         __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
     }
+    if (huart->Instance==LPUART1)
+    {
+        HAL_UARTEx_ReceiveToIdle_DMA(&hlpuart1, VT_RxBuffer, sizeof(VT_RxBuffer));
+    }
 }
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -89,6 +98,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
     if(huart->Instance == USART2)
     {
+        RC_TimeOut_cnt++;
         Callback_RC_Handle(&remote_control, huart->pRxBuffPtr);
         deshake_all();
         HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RC_Buffer, RC_BUFFER_SIZE);
@@ -109,5 +119,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
         HAL_UARTEx_ReceiveToIdle_DMA(&huart3,judge_RxBuffer,sizeof(judge_RxBuffer));		// 重新使能串口3接收中断
         __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
     }
-
+    if (huart->Instance==LPUART1)
+    {
+        Callback_VT_Handle(&VT_control,VT_RxBuffer);
+        HAL_UARTEx_ReceiveToIdle_DMA(&hlpuart1, VT_RxBuffer, sizeof(VT_RxBuffer));
+    }
 }

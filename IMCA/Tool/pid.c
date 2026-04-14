@@ -126,10 +126,10 @@ void PidInit(void)
     PID_struct_init(&Automatic_aiming_spd, POSITION_PID, 4, 1, 0.050f, 0.00f, 0.0f);
 
 
-    PID_struct_init(&Chassis_Rotate, POSITION_PID, 5000.0, 10, 4000.0f, 0.00f, 10.0f);
+    PID_struct_init(&Chassis_Rotate, POSITION_PID, 5000.0, 100, 110.0f, 0.1f, 0.0f);
 
-    PID_struct_init(&xMotorPid[POS][ECO][YAW], POSITION_PID, 1000, 8, 12.0f, 0.00f, 2.0f);
-    PID_struct_init(&xMotorPid[SPD][ECO][YAW], POSITION_PID, 10, 1, 1.22f, 0.004f, 2.0f);
+    PID_struct_init(&xMotorPid[POS][ECO][YAW], POSITION_PID, 1000, 300, 20.0f, 0.0f, 10.2f);
+    PID_struct_init(&xMotorPid[SPD][ECO][YAW], POSITION_PID, 10, 1, 0.071f, 0.002f, 0.0f);
     PID_struct_init(&xMotorPid[POS][IMU][YAW], POSITION_PID, 1000, 10, 8.0f, 0.0f, 0.2f);
     PID_struct_init(&xMotorPid[SPD][IMU][YAW], POSITION_PID, 10, 1, 0.08f, 0.00f, 0.0f);
 

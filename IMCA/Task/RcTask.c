@@ -9,6 +9,9 @@
 RC_Type remote_control;
 RC_Type mouse_control;
 uint8_t RC_Buffer[RC_BUFFER_SIZE];
+
+VT_Type VT_control;
+uint8_t VT_RxBuffer[100]={0};
 //������İ���
 //������İ���
 Key_deshake_t mouse_left;//��������
@@ -29,6 +32,61 @@ Key_deshake_t	X;
 Key_deshake_t	C;
 Key_deshake_t	V;	
 Key_deshake_t	B;
+uint8_t RC_TimeOut_Flag=0;
+uint8_t RC_TimeOut_cnt=0;
+
+
+
+static uint32_t VT_GetBits(const uint8_t *buff, uint16_t start_bit, uint8_t bit_len) {
+	uint32_t value = 0;
+
+	for (uint8_t i = 0; i < bit_len; i++) {
+		uint16_t bit_pos = start_bit + i;
+		value |= ((uint32_t)((buff[bit_pos / 8] >> (bit_pos % 8)) & 0x01U)) << i;
+	}
+
+	return value;
+}
+
+void Callback_VT_Handle(VT_Type* vt, uint8_t* buff) {
+		if (vt == 0 || buff == 0) {
+			return;
+		}
+
+		// 帧头校验：0xA9 0x53
+		if (buff[0] != 0xA9 || buff[1] != 0x53) {
+			return;
+		}
+
+		// 解析遥控器通道数据 (ch1-ch4)
+		vt->ch1 = (int16_t)((int32_t)VT_GetBits(buff, 16, 11) - 1024);
+		vt->ch2 = (int16_t)((int32_t)VT_GetBits(buff, 27, 11) - 1024);
+		vt->ch3 = (int16_t)((int32_t)VT_GetBits(buff, 38, 11) - 1024);
+		vt->ch4 = (int16_t)((int32_t)VT_GetBits(buff, 49, 11) - 1024);
+
+		vt->_switch = (uint8_t)VT_GetBits(buff, 60, 2);
+		vt->PauseButton = (uint8_t)VT_GetBits(buff, 62, 1);
+		vt->Custom_leftKey = (uint8_t)VT_GetBits(buff, 63, 1);
+		vt->Custom_rightKey = (uint8_t)VT_GetBits(buff, 64, 1);
+		vt->ch5 = (int16_t)((int32_t)VT_GetBits(buff, 65, 11) - 1024);
+		vt->Trigger_key = (uint8_t)VT_GetBits(buff, 76, 1);
+
+		vt->mouse.x = (int16_t)VT_GetBits(buff, 80, 16);
+		vt->mouse.y = (int16_t)VT_GetBits(buff, 96, 16);
+		vt->mouse.z = (int16_t)VT_GetBits(buff, 112, 16);
+
+		vt->mouse.press_left = (uint8_t)(VT_GetBits(buff, 128, 2) & 0x01U);
+		vt->mouse.press_right = (uint8_t)(VT_GetBits(buff, 130, 2) & 0x01U);
+		vt->mouse.press_middle = (uint8_t)(VT_GetBits(buff, 132, 2) & 0x01U);
+
+		// 解析键盘按键码
+		vt->keyBoard.key_code = (uint16_t)VT_GetBits(buff, 136, 16);
+
+
+}
+
+
+
 
 /**********************************************************************************************************************
   * @Func	 void Callback_RC_Handle(RC_Type* rc, uint8_t* buff)
@@ -124,8 +182,8 @@ void key_deshake(int16_t key_input, Key_deshake_t *data)
 
 void deshake_all(void)
 {
-	key_deshake(remote_control.mouse.press_left, &mouse_left);
-	key_deshake(remote_control.mouse.press_right, &mouse_right);
+	key_deshake(MOUSE_PRESS_LEFT, &mouse_left);
+	key_deshake(MOUSE_PRESS_RIGHT, &mouse_right);
 	key_deshake(((uint16_t)1 << 0)&remote_control.keyBoard.key_code, &W);
 	key_deshake(((uint16_t)1 << 1)&remote_control.keyBoard.key_code, &S);
 	key_deshake(((uint16_t)1 << 2)&remote_control.keyBoard.key_code, &A);
