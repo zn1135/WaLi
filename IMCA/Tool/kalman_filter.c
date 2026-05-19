@@ -128,7 +128,7 @@
 
 #include "kalman_filter.h"
 
-
+// 暂时没用设计，后续可以根据需要调整
 
 uint16_t sizeof_float, sizeof_double;
 static void H_K_R_Adjustment(KalmanFilter_t *kf);
@@ -296,14 +296,14 @@ void Kalman_Filter_xhatMinusUpdate(KalmanFilter_t *kf)
         {
             kf->temp_vector.numRows = kf->xhatSize;
             kf->temp_vector.numCols = 1;
-//					 if(stop_time==0)
-//					 {
-//					   kf->MatStatus = Matrix_Multiply(&kf->temp_F, &kf->xhat, &kf->temp_vector);
-//					 }
-//					 else
-//					 {
-					  kf->MatStatus = Matrix_Multiply(&kf->F, &kf->xhat, &kf->temp_vector);
-				//	 }
+            //					 if(stop_time==0)
+            //					 {
+            //					   kf->MatStatus = Matrix_Multiply(&kf->temp_F, &kf->xhat, &kf->temp_vector);
+            //					 }
+            //					 else
+            //					 {
+            kf->MatStatus = Matrix_Multiply(&kf->F, &kf->xhat, &kf->temp_vector);
+            //	 }
             kf->temp_vector1.numRows = kf->xhatSize;
             kf->temp_vector1.numCols = 1;
             kf->MatStatus = Matrix_Multiply(&kf->B, &kf->u, &kf->temp_vector1);

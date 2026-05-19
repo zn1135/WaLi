@@ -2,7 +2,7 @@
   *********************************************************************
   * @file      ins_task.c/h
   * @brief     ����������mahony������ȡ������̬��ͬʱ��ȡ�����ھ�������ϵ�µ��˶����ٶ�
-  * @note       
+  * @note
   * @history
   *
   @verbatim
@@ -12,20 +12,20 @@
   @endverbatim
   *********************************************************************
   */
-	
 
 #include "INS_task.h"
-#include "math.h"
 #include "ChassisControl.h"
 #include "IMU_Task.h"
 #include "Ramp.h"
+#include "math.h"
+
+// 暂时没用设计，后续可以根据需要调整
 
 // INS_t INS;
 //
 // struct MAHONY_FILTER_t mahony;
 // Axis3f Gyro,Accel;
 // float gravity[3] = {0, 0, 9.81f};
-
 
 // uint32_t INS_DWT_Count = 0;
 // float ins_dt = 0.004f;
@@ -178,36 +178,35 @@ void EarthFrameToBodyFrame(const float *vecEF, float *vecBF, float *q)
  * @retval         无
  * @note           旋转矩阵按照ZYX欧拉角顺序计算，使用ARM DSP库的快速三角函数
  */
-void Get_Rotation_BtoE(float roll,float pitch,float yaw,float P_Acc,float R_Acc,float Y_Acc)
+void Get_Rotation_BtoE(float roll, float pitch, float yaw, float P_Acc, float R_Acc, float Y_Acc)
 {
-	/* 根据欧拉角计算旋转矩阵元素 */
-	Rotation_BtoE[0] = arm_cos_f32(yaw)*arm_cos_f32(pitch);
-	Rotation_BtoE[1] = arm_cos_f32(yaw)*arm_sin_f32(pitch)*arm_sin_f32(roll)-arm_sin_f32(yaw)*arm_cos_f32(roll);
-	Rotation_BtoE[2] = arm_cos_f32(yaw)*arm_sin_f32(pitch)*arm_cos_f32(roll)+arm_sin_f32(yaw)*arm_sin_f32(roll);
-	Rotation_BtoE[3] = arm_sin_f32(yaw)*arm_cos_f32(pitch);
-	Rotation_BtoE[4] = arm_sin_f32(yaw)*arm_sin_f32(pitch)*arm_sin_f32(roll)+arm_cos_f32(yaw)*arm_cos_f32(roll);
-	Rotation_BtoE[5] = arm_sin_f32(yaw)*arm_sin_f32(pitch)*arm_cos_f32(roll)-arm_cos_f32(yaw)*arm_sin_f32(roll);
-	Rotation_BtoE[6] = -arm_sin_f32(pitch);
-	Rotation_BtoE[7] = arm_cos_f32(pitch)*arm_sin_f32(roll);
-	Rotation_BtoE[8] = arm_cos_f32(pitch)*arm_cos_f32(roll);
-	
-	/* 保存机体坐标系下的加速度计读数 */
-	Acc_Body[0] = P_Acc;//x
-	Acc_Body[1] = R_Acc;//Y
-	Acc_Body[2] = Y_Acc;//z
+    /* 根据欧拉角计算旋转矩阵元素 */
+    Rotation_BtoE[0] = arm_cos_f32(yaw) * arm_cos_f32(pitch);
+    Rotation_BtoE[1] = arm_cos_f32(yaw) * arm_sin_f32(pitch) * arm_sin_f32(roll) - arm_sin_f32(yaw) * arm_cos_f32(roll);
+    Rotation_BtoE[2] = arm_cos_f32(yaw) * arm_sin_f32(pitch) * arm_cos_f32(roll) + arm_sin_f32(yaw) * arm_sin_f32(roll);
+    Rotation_BtoE[3] = arm_sin_f32(yaw) * arm_cos_f32(pitch);
+    Rotation_BtoE[4] = arm_sin_f32(yaw) * arm_sin_f32(pitch) * arm_sin_f32(roll) + arm_cos_f32(yaw) * arm_cos_f32(roll);
+    Rotation_BtoE[5] = arm_sin_f32(yaw) * arm_sin_f32(pitch) * arm_cos_f32(roll) - arm_cos_f32(yaw) * arm_sin_f32(roll);
+    Rotation_BtoE[6] = -arm_sin_f32(pitch);
+    Rotation_BtoE[7] = arm_cos_f32(pitch) * arm_sin_f32(roll);
+    Rotation_BtoE[8] = arm_cos_f32(pitch) * arm_cos_f32(roll);
+
+    /* 保存机体坐标系下的加速度计读数 */
+    Acc_Body[0] = P_Acc; // x
+    Acc_Body[1] = R_Acc; // Y
+    Acc_Body[2] = Y_Acc; // z
 }
 
 /**********************************************************************************************************************
-  * @Func	 void My_BodyFrameToEarthFrame_Matrix(void)
-  * @Brief   使用旋转矩阵将机体坐标系加速度转换到地球坐标系
-  * @Param	 无
-  * @Retval	 无
-  * @Note    使用Get_Rotation_BtoE计算的旋转矩阵Rotation_BtoE进行坐标变换
-*********************************************************************************************************************/
+ * @Func	 void My_BodyFrameToEarthFrame_Matrix(void)
+ * @Brief   使用旋转矩阵将机体坐标系加速度转换到地球坐标系
+ * @Param	 无
+ * @Retval	 无
+ * @Note    使用Get_Rotation_BtoE计算的旋转矩阵Rotation_BtoE进行坐标变换
+ *********************************************************************************************************************/
 void My_BodyFrameToEarthFrame_Matrix(void)
 {
-	Acc_Normol[0] = Rotation_BtoE[0]*Acc_Body[0]+Rotation_BtoE[1]*Acc_Body[1]+Rotation_BtoE[2]*Acc_Body[2];
-	Acc_Normol[1] = Rotation_BtoE[3]*Acc_Body[0]+Rotation_BtoE[4]*Acc_Body[1]+Rotation_BtoE[5]*Acc_Body[2];
-	Acc_Normol[2] = Rotation_BtoE[6]*Acc_Body[0]+Rotation_BtoE[7]*Acc_Body[1]+Rotation_BtoE[8]*Acc_Body[2];
+    Acc_Normol[0] = Rotation_BtoE[0] * Acc_Body[0] + Rotation_BtoE[1] * Acc_Body[1] + Rotation_BtoE[2] * Acc_Body[2];
+    Acc_Normol[1] = Rotation_BtoE[3] * Acc_Body[0] + Rotation_BtoE[4] * Acc_Body[1] + Rotation_BtoE[5] * Acc_Body[2];
+    Acc_Normol[2] = Rotation_BtoE[6] * Acc_Body[0] + Rotation_BtoE[7] * Acc_Body[1] + Rotation_BtoE[8] * Acc_Body[2];
 }
-

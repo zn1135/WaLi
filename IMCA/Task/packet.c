@@ -1,36 +1,36 @@
-﻿#include <string.h>
+﻿#include "packet.h"
 #include <stdio.h>
-#include "packet.h"
+#include <string.h>
 
 #ifndef ARRAY_SIZE
-#define ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
 #ifndef CH_OK
-#define CH_OK   (0)
+#define CH_OK (0)
 #endif
 
 #ifndef CH_ERR
-#define CH_ERR  (1)
+#define CH_ERR (1)
 #endif
 uint32_t frame_count;
-uint8_t Chaoneng_Imu; //IMU 200ms超时标志位
-uint32_t frame_rate;  //获取帧频率
-
+uint8_t Chaoneng_Imu; // IMU 200ms超时标志位
+uint32_t frame_rate;  // 获取帧频率
+// IMU无用设计，暂时放在这里，后续可以重构掉
 /**********************************************************************************************************************
-  * @Func	 static void crc16_update(uint16_t *currect_crc, const uint8_t *src, uint32_t len)
-  * @Brief   CRC16校验值更新
-  * @Param	 uint16_t *currect_crc：当前CRC值指针(输入/输出)
-  *          const uint8_t *src：源数据
-  *          uint32_t len：数据长度
-  * @Retval	 无
-  * @Note    用于IMU数据包的CRC16校验
-*********************************************************************************************************************/
+ * @Func	 static void crc16_update(uint16_t *currect_crc, const uint8_t *src, uint32_t len)
+ * @Brief   CRC16校验值更新
+ * @Param	 uint16_t *currect_crc：当前CRC值指针(输入/输出)
+ *          const uint8_t *src：源数据
+ *          uint32_t len：数据长度
+ * @Retval	 无
+ * @Note    用于IMU数据包的CRC16校验
+ *********************************************************************************************************************/
 static void crc16_update(uint16_t *currect_crc, const uint8_t *src, uint32_t len)
 {
     uint32_t crc = *currect_crc;
     uint32_t j;
-    for (j=0; j < len; ++j)
+    for (j = 0; j < len; ++j)
     {
         uint32_t i;
         uint32_t byte = src[j];
@@ -44,20 +44,19 @@ static void crc16_update(uint16_t *currect_crc, const uint8_t *src, uint32_t len
             }
             crc = temp;
         }
-    } 
+    }
     *currect_crc = crc;
 }
 
-
 enum status
 {
-    kStatus_Idle,      //空闲状态
-    kStatus_Cmd,       //命令字状态
-    kStatus_LenLow,    //长度低位状态
-    kStatus_LenHigh,   //长度高位状态
-    kStatus_CRCLow,    //CRC低位状态
-    kStatus_CRCHigh,   //CRC高位状态
-    kStatus_Data,      //数据状态
+    kStatus_Idle,    // 空闲状态
+    kStatus_Cmd,     // 命令字状态
+    kStatus_LenLow,  // 长度低位状态
+    kStatus_LenHigh, // 长度高位状态
+    kStatus_CRCLow,  // CRC低位状态
+    kStatus_CRCHigh, // CRC高位状态
+    kStatus_Data,    // 数据状态
 };
 
 /* 函数指针 */
@@ -72,7 +71,7 @@ static packet_t *RxPkt;
  * @code
  *      void OnDataReceived(packet_t *pkt)
  *      {
- *          pkt->buf 为数据 pkt->payload_len 为接收到的字节数 
+ *          pkt->buf 为数据 pkt->payload_len 为接收到的字节数
  *      }
  *
  *      packet_t pkt;
@@ -100,70 +99,70 @@ void packet_decode_init(packet_t *pkt, on_data_received_event func)
  */
 uint32_t packet_decode(uint8_t c)
 {
-    static uint16_t CRCReceived = 0;            /* 从数据帧接收到的CRC值 */
-    static uint16_t CRCCalculated = 0;          /* 从数据帧计算得到的CRC值 */
-    static uint8_t status = kStatus_Idle;       /* 状态机 */
+    static uint16_t CRCReceived = 0;      /* 从数据帧接收到的CRC值 */
+    static uint16_t CRCCalculated = 0;    /* 从数据帧计算得到的CRC值 */
+    static uint8_t status = kStatus_Idle; /* 状态机 */
     static uint8_t crc_header[4] = {0x5A, 0xA5, 0x00, 0x00};
-  
-    switch(status)
+
+    switch (status)
     {
-        case kStatus_Idle:
-            if(c == 0x5A)
-                status = kStatus_Cmd;
-			break;
-        case kStatus_Cmd:
-            RxPkt->type = c;
-			if(RxPkt->type == 0xA5)
-				status = kStatus_LenLow;
-            break;
-        case kStatus_LenLow:
-            RxPkt->payload_len = c;
-            crc_header[2] = c;
-            status = kStatus_LenHigh;
-            break;
-        case kStatus_LenHigh:
-            RxPkt->payload_len |= (c<<8);
-            crc_header[3] = c;
-            status = kStatus_CRCLow;
-            break;
-        case kStatus_CRCLow:
-            CRCReceived = c;
-            status = kStatus_CRCHigh;
-            break;
-        case kStatus_CRCHigh:
-            CRCReceived |= (c<<8);
-            RxPkt->ofs = 0;
-            CRCCalculated = 0;
-            status = kStatus_Data;
-            break;
-        case kStatus_Data:
-	
-            RxPkt->buf[RxPkt->ofs++] = c;
+    case kStatus_Idle:
+        if (c == 0x5A)
+            status = kStatus_Cmd;
+        break;
+    case kStatus_Cmd:
+        RxPkt->type = c;
+        if (RxPkt->type == 0xA5)
+            status = kStatus_LenLow;
+        break;
+    case kStatus_LenLow:
+        RxPkt->payload_len = c;
+        crc_header[2] = c;
+        status = kStatus_LenHigh;
+        break;
+    case kStatus_LenHigh:
+        RxPkt->payload_len |= (c << 8);
+        crc_header[3] = c;
+        status = kStatus_CRCLow;
+        break;
+    case kStatus_CRCLow:
+        CRCReceived = c;
+        status = kStatus_CRCHigh;
+        break;
+    case kStatus_CRCHigh:
+        CRCReceived |= (c << 8);
+        RxPkt->ofs = 0;
+        CRCCalculated = 0;
+        status = kStatus_Data;
+        break;
+    case kStatus_Data:
 
-            if(RxPkt->ofs >= MAX_PACKET_LEN)
-            {
-                status = kStatus_Idle;
-                return CH_ERR;   
-            }
+        RxPkt->buf[RxPkt->ofs++] = c;
 
-            if(RxPkt->ofs >= RxPkt->payload_len && RxPkt->type == 0xA5)
-            {
-                /* 计算CRC */
-                crc16_update(&CRCCalculated, crc_header, 4);
-                crc16_update(&CRCCalculated, RxPkt->buf, RxPkt->ofs);
-                
-                /* CRC匹配 */
-                if(CRCCalculated == CRCReceived)
-                {
-					frame_count++;
-                    event_handler(RxPkt);
-                }
-                status = kStatus_Idle;
-            }
-            break;
-        default:
+        if (RxPkt->ofs >= MAX_PACKET_LEN)
+        {
             status = kStatus_Idle;
-            break;
+            return CH_ERR;
+        }
+
+        if (RxPkt->ofs >= RxPkt->payload_len && RxPkt->type == 0xA5)
+        {
+            /* 计算CRC */
+            crc16_update(&CRCCalculated, crc_header, 4);
+            crc16_update(&CRCCalculated, RxPkt->buf, RxPkt->ofs);
+
+            /* CRC匹配 */
+            if (CRCCalculated == CRCReceived)
+            {
+                frame_count++;
+                event_handler(RxPkt);
+            }
+            status = kStatus_Idle;
+        }
+        break;
+    default:
+        status = kStatus_Idle;
+        break;
     }
     return CH_OK;
 }

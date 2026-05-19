@@ -1,183 +1,279 @@
-# 项目架构总览（中文）
+# WallE Robot — RoboMaster 步兵机器人主控固件
 
-本文档面向 STM32G474 半舵机云台项目，说明代码整体框架：系统如何在 FreeRTOS 下组织、初始化与运行；主要模块、线程、驱动、数据流与可扩展点，帮助快速理解与上手。
+## 1. 项目概述
 
+本项目是基于 **STM32G474RET6** 微控制器的 RoboMaster 竞赛步兵机器人主控程序，搭载 **FreeRTOS** 实时操作系统，使用 **CubeMX + CLion** 工具链开发（ARM-GCC 编译，CMake 构建）。
 
-## 顶层结构
-- CubeMX 生成的 HAL + CMSIS + FreeRTOS 位于 `Core/` 和 `Drivers/`。
-- 业务逻辑集中在 `IMCA/` 下，分三层：
-  - IMCA/Task：应用任务与高层控制（云台、底盘、射击、CAN、UART、遥控器、IMU）。
-  - IMCA/Tool：可复用算法/工具（PID、卡尔曼、INS、Motor 抽象、VOFA 发送、视觉交互）。
-  - IMCA/User：项目级工具函数与封装。
-- 中间件与第三方源码在 `Middlewares/Third_Party`（FreeRTOS、ARM CMSIS DSP 等）。
-- 构建系统为 CMake；顶层 `CMakeLists.txt`、`CMakePresets.json` 管理目标与预设。
+机器人具备遥控/PC键鼠双模控制、全向麦轮底盘、双轴云台、摩擦轮发射、超级电容功率管理、MiniPC视觉自瞄等功能。
 
+---
 
-## 启动与初始化路径
-- 入口：`Core/Src/main.c`
-  - HAL_Init -> SystemClock_Config -> 外设初始化（GPIO、DMA、FDCAN1/2/3、UART4/5、USART1/2/3、TIM4）。
-  - osKernelInitialize -> `MX_FREERTOS_Init()` -> osKernelStart（启动调度器）。
-- `Core/Src/app_freertos.c` 中的 `MX_FREERTOS_Init` 创建线程：
-  - Judge_Task：初始化 USB 设备，并向上位机发送视觉信息。
-  - Init_Task：执行 `TotalInitTask` 完成系统初始化后自结束。
-  - Ctrl_Task：执行 `TotalControl`（主控制流水线）。
-  - Interact_Task：发送 CAN 帧与电机电流，是外设交互与状态上报的通道。
-  - Reset_Task：可选的系统复位逻辑（`ALL_reset`）。
+## 2. 硬件平台
 
+| 部件 | 型号/说明 |
+|------|-----------|
+| 主控芯片 | STM32G474RET6 (Cortex-M4F, 170MHz) |
+| CAN总线 | 3路 FDCAN：CAN1（前侧4底盘电机）、CAN2（后侧4电机）、CAN3（云台DM电机+超电） |
+| 电机 | DJI M3508 ×6（4底盘+1高度+1摩擦轮左）、DJI M2006 ×2（1拨弹+1摩擦轮右）、DM J4310 ×2（YAW+PITCH云台电机） |
+| IMU | 外接 IMU 模块，串口5接收数据 |
+| 视觉 | MiniPC 通过 LPUART1 (VT串口) 通信，发送目标位姿、接收自瞄指令 |
+| 超电 | 超级电容模块，CAN3/ID=0x108 通信，支持功率缓冲 |
+| 遥控器 | DJI 遥控器（串口2）/ PC上位机VT（LPUART1），支持热切换 |
+| 裁判系统 | 串口3 接收比赛裁判系统数据（热量、血量、伤害信息等） |
+| USB | USB-CDC 虚拟串口，用于调试和固件升级 |
 
-## FreeRTOS 线程职责
-- Judge_Task（裁判/上位交互）
-  - 调用 `MX_USB_Device_Init()` 初始化 USB 设备栈（CDC/MSC 视 CubeMX 配置）。
-  - 周期性调用 `MiniPC_SendVisionFrameInfo(&MiniPC_SendPacket)`（见 `Vision_interact`）发送视觉帧信息。
-- Init_Task（初始化）
-  - 调用 `TotalInitTask()`（`IMCA/Task/ControlTask.c`）：
-    - 配置 CAN 过滤（`CANFilterInit`）。
-    - 设置默认控制模式（LOSE）。
-    - 使能 IMU（UART5）与遥控器（USART2）空闲中断 DMA。
-    - 初始化电机参数（`MotorInit`）与 PID 参数（`PidInit`）。
-  - 延时后终止自身（一次性任务）。
-- Ctrl_Task（主控制）
-  - 周期调用 `TotalControl()`：
-    -（可选）更新 IMU 姿态（yaw/pitch/roll），并绑定到电机参数。
-    - 基于遥控器拨杆选择控制模式（`CtrlModeSelect`）。
-    - 进行去抖/去抖动处理（`deshake_all`），计算目标量（`TotalControlSetValue`）。
-    - 通过 `Vofa_Send_Data16(...)` 发送诊断数据。
-    - 对各执行机构进行 PID 计算（`PidCalc` -> `MotorCalc`）。
-- Interact_Task（交互）
-  - 通过 `MotorCanSendCurrent()` 下发电机电流。
-  - 通过 `send_can2can(...)`（FDCAN2）汇总并广播云台状态/视觉/射击标志。
-- Reset_Task（复位）
-  - 调用 `ALL_reset(0)`；当入参设为 1 时，延时后进行 NVIC 系统复位。
+---
 
+## 3. 代码目录结构
 
-## 控制流水线概览
-- `ControlTask.c` 是核心调度者：
-  - `CtrlModeSelect`：读取遥控器拨杆确定模式：
-    - 左上拨杆选择 CtrlMode：PC、RC、LOSE。
-    - RC 模式下，右上拨杆选择底盘模式（分离/跟随/陀螺）。
-    - PC 模式下，右上拨杆选择云台模式（不射击/常规/去弹跳），并可能强制底盘分离。
-  - `TotalControlSetValue`：依据 CtrlMode 与 GimbalMode 计算 PITCH/YAW 的期望角度/速度：
-    - LOSE：失控/失联时，重置角度保存标志，待恢复后继承。
-    - RC：将遥控器通道（ch3，ch4）映射为 yaw/pitch 设定值。
-    - PC：
-      - 鼠标右键或 ch5 触发进入 ImuFeedback，并在 `fireflag != 0` 时使用 MiniPC 的视觉目标（yaw/pitch/vel/acc）。
-      - 否则，PITCH 切回 EcoFeedback，根据鼠标增量调整；YAW 使用总角度跟踪并按鼠标 X 调整。
-    - 对 PITCH 施加机械/安全角度限制与零点死区处理。
-  - `PidCalc`：对每个电机调用 `MotorCalc`，在编码器（Eco）或 IMU 反馈模式间切换并进行 PID 计算。
-  - `GimbalInit`：等待 PITCH 与 YAW 回零且 DM 驱动上报初始化成功；然后设置 IMU 角偏移，启用总角度模式、方向标志，并置位 `Gimbal_Init_Flag`。
+```
+├── Core/                       # STM32CubeMX 自动生成的HAL外设驱动代码
+│   ├── Inc/                    # 外设头文件 (adc.h, fdcan.h, tim.h, usart.h, FreeRTOSConfig.h ...)
+│   └── Src/                    # 外设源文件及 main.c, app_freertos.c (FreeRTOS任务创建)
+├── Drivers/                    # STM32 HAL库 / CMSIS
+├── Middlewares/                # FreeRTOS / USB Device / DSP库
+├── IMCA/                       # ★ 自定义应用层代码 (核心)
+│   ├── User/                   # 通用定义与工具函数
+│   │   ├── user_lib.h/c        # 全局宏/枚举/结构体/工具函数（角度映射、跨圈处理、前后向判断等）
+│   ├── Task/                   # 各功能任务模块
+│   │   ├── ControlTask.h/c     # 系统总控任务：总初始化、控制模式选择、控制量分派、PID调度
+│   │   ├── ChassisControl.h/c  # 底盘控制：运动学解算（麦轮）、跟随/分离/小陀螺三种模式
+│   │   ├── GimbalControl.h/c   # 云台控制：YAW/Pitch角度给定、自瞄、升降逻辑
+│   │   ├── ShootControl.h/c    # 射击控制：摩擦轮转速、拨弹轮控制、热量约束、堵转保护
+│   │   ├── CanBus_Task.h/c     # CAN总线任务：滤波器初始化、电机数据收发、CAN中断回调
+│   │   ├── RcTask.h/c          # 遥控器/VT数据解析与按键去抖
+│   │   ├── UartTask.h/c        # 串口空闲中断管理
+│   │   ├── IMU_Task.h/c        # IMU数据更新任务
+│   │   ├── imu_data_decode.h/c # IMU协议解析
+│   │   └── packet.h/c          # 数据包封装/解包
+│   ├── Tool/                   # 算法与工具库
+│   │   ├── Motor.h/c           # 电机模型：参数定义、PID计算调度、uint/float互转
+│   │   ├── pid.h/c             # PID控制器（位置式，含积分分离、限幅）
+│   │   ├── PowerLimit.h/c      # 底盘功率限制：功率模型+滑动平均+PID限幅
+│   │   ├── CapInteract.h/c     # 超级电容通信：状态读取、模式设置
+│   │   ├── Vision_interact.h/c # MiniPC视觉通信：发送机器人位姿、接收自瞄指令
+│   │   ├── kalman_filter.h/c   # 卡尔曼滤波器
+│   │   ├── Ramp.h/c            # 斜坡/低通滤波器
+│   │   ├── Vofa_send.h/c       # Vofa+ 调试上位机数据发送
+│   │   ├── adc_handle.h/c      # ADC 电池电压采样处理
+│   │   └── INS_task.h/c        # 惯导姿态解算
+│   └── Judge/                  # 裁判系统交互与UI
+│       ├── Judge_interact.h/c  # 裁判系统数据解析（血量、热量、伤害ID等）
+│       ├── Driver_Judge.h/c    # 裁判系统底层驱动
+│       ├── UI.h/c / UI_STRUCT.h # 裁判系统串口屏UI绘制
+│       └── ui_picTask.c        # UI图片任务
+├── USB_Device/                 # USB-CDC 虚拟串口
+├── CMakeLists.txt              # CMake 构建配置
+└── README.md                   # 本文件
+```
 
+---
 
-## 电机抽象（`IMCA/Tool/Motor.c`）
-- `motor_param_t xMotorParam[MOTOR_NUM]` 描述执行器：
-  - CAN ID、名称、所在总线、类型（DJI/DM）、反馈模式（Eco/IMU）、闭环类型（位置/速度）、测量链路（编码器/DM/IMU）、PID 参数指针等。
-- 初始化映射：
-  - FRICTR（右摩擦轮）：CAN1，DJI，速度环。
-  - FRICTL（左摩擦轮）：CAN1，DJI，速度环。
-  - PITCH：CAN3，DM，位置环，使用 IMU + DM 测量。
-  - YAW：CAN2，DM，位置环，使用 IMU + DM 测量。
-- `MotorCalc` 分派：
-  - `PidCalcEco`：基于编码器/DM 的位置/速度（取决于 TotalAngleState 与 CloseLoopMode）进行 PID。
-  - `PidCalcIMU`：基于 IMU 角或总角进行 PID；可按方向反相输出。
-- 提供 MIT 模式 DM 驱动的浮点/整数比例映射辅助函数。
+## 4. FreeRTOS 任务架构
 
+系统启动后创建 **5个FreeRTOS线程**（定义于 [app_freertos.c](Core/Src/app_freertos.c)）：
 
-## 传感与数据来源
-- IMU（`IMCA/Task/IMU_Task.*`）：提供角度、角速度、总角度；`Imu_param_update` 将 IMU 读数更新到 `IMU_Yaw/Pitch/Roll` 并通过 `MotorImuUpdata` 绑定到电机。
-- 遥控器（`IMCA/Task/RcTask.*`）：读取通道、拨杆状态与鼠标增量；宏如 `RC_UPPER_LEFT_SW_UP` 表征拨杆位置。
-- 视觉（`IMCA/Tool/Vision_interact.*`）：与 MiniPC 通讯；`MiniPC_ReceivePacket` 包含 yaw/pitch 目标、速度、加速度与 `fireflag`。
-- 编码器/DM（`IMCA/Tool/Motor.h` + FDCAN）：DM_J4310 驱动测量（位置、速度、初始化标志），DJI 编码器测量等。
+| 任务名 | 函数 | 功能 | 周期 |
+|--------|------|------|------|
+| **Judge_Task** | `JudgeTask()` | USB初始化 + MiniPC视觉帧发送 | ~1ms |
+| **Init_Task** | `InitTask()` | 外设总初始化（CAN滤波、UART、电机参数、PID参数），完成后自删除 | 仅上电一次 |
+| **Ctrl_Task** | `CtrlTask()` | 主控制循环：IMU更新→模式选择→滤波→消抖→控制量给定 | ~1ms |
+| **Interact_Task** | `InteractTask()` | CAN总线电流发送 + 超电功率发送 | ~1ms |
+| **Reset_Task** | `ResetTask()` | 看门狗监控 + UI刷新 + 组合键复位 | ~1ms |
 
+**主控制循环执行流程**（`TotalControl()`）：
+```
+IMU数据更新 → 控制模式选择 → 鼠标一阶滤波 → 按键消抖 → TotalControlSetValue()
+  └─ GimbalInit（如未初始化）
+  └─ LiftLowerControl（升降限位）
+  └─ GimbalControlSetValue（云台角度给定）
+  └─ ShootControlSetValue（摩擦轮+拨弹）
+  └─ PluckControl（拨弹逻辑）
+  └─ ChassisControlSetValue（底盘速度给定）
+  └─ ChassisControl_Calculating（麦轮运动学解算）
+  └─ PidCalc（10个电机PID计算）
+  └─ PowertotalLimit（功率限制）
+```
 
-## 通讯
-- CAN（FDCAN1/2/3）：
-  - 过滤在 `CANFilterInit` 设置。
-  - 下发接口：`MotorCanSendCurrent()`（电机电流）；`send_can2can(...)`（状态广播）。
-- UART/USART：
-  - UART5：IMU 数据，使用空闲中断 DMA（`HAL_UARTEx_ReceiveToIdle_DMA_NoIT(&huart5)`）。
-  - USART2：遥控器接收，空闲中断 DMA。
-  - 其他串口（UART4、USART1/3）可按需扩展。
-- USB 设备：
-  - 在 Judge_Task 中 `MX_USB_Device_Init()` 初始化。
-  - 通过 `MiniPC_SendVisionFrameInfo` 将信息发送到 MiniPC。
-- VOFA 可视化（`IMCA/Tool/Vofa_send.*`）：
-  - `Vofa_Send_Data2/4/8/16` 将浮点通道打包并附加固定帧尾，便于上位机可视化。
-  - 在 `TotalControl` 中用于诊断（位置、输出、IMU 角、模式等）。
+---
 
+## 5. 电机系统
 
-## 模式与状态标志
-- `xRobotMode` 保存 CtrlMode（PC/RC/LOSE）、GimbalMode（NOSHOOT/NORMAL/UNBOUNCE）、ChassisMode（SEPARA/FOLLOW/GYROSC）。
-- `Gimbal_Init_Flag` 表示云台初始化完成（DM 驱动归零成功且角度对齐）。
-- `AUTO_Shoot_flag`、`mouse_right.deshake_key`、`MiniPC_ReceivePacket.fireflag` 协同自动瞄准/射击行为。
-- `TotalAngleState` 决定 IMU/编码器 PID 使用瞬时角还是累计总角。
+### 5.1 电机列表（定义于 [user_lib.h](IMCA/User/user_lib.h)）
 
+| 编号 | 名称 | 类型 | CAN总线 | CAN ID | 反馈 | 功能 |
+|------|------|------|---------|--------|------|------|
+| 0 | WHEEL_FR | DJI M3508 | CAN1 | 0x201 | 编码器 | 前右轮 |
+| 1 | WHEEL_FL | DJI M3508 | CAN1 | 0x202 | 编码器 | 前左轮 |
+| 2 | WHEEL_BR | DJI M3508 | CAN1 | 0x203 | 编码器 | 后右轮 |
+| 3 | WHEEL_BL | DJI M3508 | CAN1 | 0x204 | 编码器 | 后左轮 |
+| 4 | YAW | DM J4310 | CAN3 | 0x01 | DM编码器+IMU | 云台偏航 |
+| 5 | PITCH | DM J4310 | CAN3 | 0x02 | DM编码器+IMU | 云台俯仰 |
+| 6 | Height | DJI M3508 | CAN2 | 0x205 | 编码器 | 升降机构 |
+| 7 | FRICTR | DJI M2006 | CAN2 | 0x206 | 编码器 | 摩擦轮右 |
+| 8 | FRICTL | DJI M3508 | CAN2 | 0x207 | 编码器 | 摩擦轮左 |
+| 9 | PLUCK | DJI M2006 | CAN2 | 0x208 | 编码器 | 拨弹轮 |
 
-## 关键数据流
-- 初始化 -> 控制主循环：
-  1. Init_Task 配置总线、DMA、过滤器与电机/PID 参数。
-  2. Ctrl_Task 更新传感器（IMU、遥控、视觉），选择模式，计算设定值。
-  3. 对各电机运行 PID，得到 `CurrentOutput`。
-  4. Interact_Task 通过 CAN 下发电流并向上位机/其他设备报告状态。
-- 视觉闭环：
-  - MiniPC 下发 yaw/pitch 目标与动态信息，系统映射到 IMU 目标并进行 PID；状态通过 USB/VOFA 回传。
+### 5.2 电机控制模式
 
+- **反馈模式**：`EcoFeedback`（编码器反馈） / `ImuFeedback`（IMU姿态反馈）
+- **闭环模式**：`PosClsloop`（位置环） / `SpdClsloop`（速度环）
+- **PID结构**：位置-速度串级PID（[pid.h](IMCA/Tool/pid.h)）
 
-## 安全、限幅与复位
-- 在 `GimbalControlSetValue` 中对 PITCH 进行角度限幅，避免机械越界。
-- 近零区间设置死区，避免微漂。
-- `ALL_reset(reset)` 在入参非零时执行延时后系统复位。
+### 5.3 DM电机 MIT 模式协议
 
+DM J4310 使用 MIT 控制模式，通过 `set_DM_J4310_MIT_info()` 发送位置/速度/KP/KD/扭矩五个浮点参数，经 `float_to_uint()` 按位宽打包到8字节CAN帧中。
 
-## 扩展与定制建议
-- 在 `app_freertos.c` 新增线程并合理设置优先级与栈空间。
-- 在 `MotorInit` 扩展电机清单，绑定测量/反馈与 PID 参数。
-- 在 `ChassisControl.c`、`GimbalControl.c`、`ShootControl.c` 中实现更多策略。
-- 接入新传感器：配置 DMA/中断与解码任务（参考 `IMU_Task.c`、`imu_data_decode.c`）。
-- 增强诊断：通过 VOFA 或 USB CDC 打印；在调用处增减 `Vofa_Send_Data16` 通道。
+---
 
+## 6. 控制模式
 
-## 构建与运行
-- 使用 CMake 构建（如 CLion 或 CubeIDE）。项目包含 `cmake/gcc-arm-none-eabi.cmake` 以支持交叉编译与 CubeMX CMake 集成。
-- 外设初始化由 CubeMX 生成；需确保 `Drivers/` 中包含 STM32Cube 固件包。
-- 通过 ST-Link 等工具将固件烧录到 STM32G474。
+### 6.1 控制来源（[ControlTask.c](IMCA/Task/ControlTask.c) — `CtrlModeSelect()`）
 
+| 模式 | 触发条件 | 说明 |
+|------|----------|------|
+| **RC** | 遥控器左上拨杆 上 | DJI遥控器控制 |
+| **PC** | 遥控器左上拨杆 中 | PC键鼠 + VT上位机控制 |
+| **LOSE** | 遥控器左上拨杆 下 或 遥控器信号丢失 | 失能所有电机，安全状态 |
 
-## 文件导览（精选）
-- Core/
-  - Src/main.c：入口、时钟、HAL 初始化、RTOS 启动。
-  - Src/app_freertos.c：线程创建与线程体。
-- IMCA/Task/
-  - ControlTask.c：初始化、主控制循环、PID 调用、VOFA 诊断。
-  - GimbalControl.c：模式相关设定值计算、云台初始化判定、鼠标/视觉混控。
-  - CanBus_Task.c/h：CAN 过滤、发送助手、电流打包。
-  - RcTask.c/h：遥控器解析、拨杆/鼠标输入。
-  - IMU_Task.c/h、imu_data_decode.c/h：IMU 处理与绑定。
-  - ShootControl.c/h、ChassisControl.c/h：执行器策略。
-  - UartTask.c/h：UART 处理助手。
-- IMCA/Tool/
-  - Motor.c/h：电机抽象、PID 选择、DM/DJI 处理。
-  - pid.c/h：PID 实现。
-  - kalman_filter.c/h、INS_task.c/h：滤波与惯导支持。
-  - Vision_interact.c/h：MiniPC 包定义、收发。
-  - Vofa_send.c/h：可视化通道发送。
-  - Ramp.c/h：斜坡生成器。
-- Drivers/：CMSIS、HAL 驱动。
+### 6.2 底盘模式（[ChassisControl.c](IMCA/Task/ChassisControl.c)）
 
+| 模式 | 说明 |
+|------|------|
+| **CHASSIS_FOLLOW** | 跟随模式：底盘方向跟随云台朝向（默认） |
+| **CHASSIS_SEPARA** | 分离模式：底盘独立运动，不跟随云台 |
+| **CHASSIS_GYROSC** | 小陀螺模式：底盘持续自转，带堵转反转检测 |
 
-## 常见排查
-- IMU 无数据：检查 UART5 空闲 DMA 与 `IMU_UPDATA` 宏。
-- 遥控无输入：确认 USART2 空闲 DMA 与 `RcTask` 解析是否正常。
-- 电机不转：校验 FDCAN 过滤、ID 与 `MotorCanSendCurrent` 载荷；确认 DM_J4310 初始化标志。
-- 云台一直未完成初始化：确认 PITCH 接近零位且 DM 驱动上报 `DM_J4310_InitFlag`。
-- USB 视觉数据未输出：检查 Judge_Task 运行、USB 设备枚举、`MiniPC_SendPacket` 是否更新。
+### 6.3 云台模式
 
+| 模式 | 说明 |
+|------|------|
+| **NORMAL_MODE** | 正常模式：可瞄准可射击 |
+| **UNBOUNCE_MODE** | 无弹模式：仅瞄准不射击 |
+| **NOSHOOT_MODE** | 禁射模式：关闭摩擦轮 |
 
-## 术语表
-- EcoFeedback：来自编码器/DM 的反馈。
-- ImuFeedback：来自 IMU 的反馈。
-- PosClsloop/SpdClsloop：位置/速度闭环控制。
-- TotalAngleState：控制中使用瞬时角或累计总角的状态标志。
+---
+
+## 7. 功率管理系统
+
+### 7.1 功率限制（[PowerLimit.c](IMCA/Tool/PowerLimit.c)）
+
+- 使用四个电机的 **功率模型**（`model[4]`）：$P = k_1 \cdot I \cdot \omega + k_2 \cdot \omega^2 + k_3 \cdot I^2 + a/4$
+- 实际电流经 20点滑动平均滤波后代入模型
+- 用 PID 控制与裁判系统功率上限比较，输出系数（0~1）等比例缩放四个底盘电机电流
+
+### 7.2 超级电容（[CapInteract.c](IMCA/Tool/CapInteract.c)）
+
+- CAN3/ID=0x108 通信
+- 电容电压 ≥ 16V 且状态正常时，额外增加功率缓冲
+- 支持设置缓冲模式（保守/均衡/激进）
+
+---
+
+## 8. 射击系统
+
+### 8.1 摩擦轮控制（[ShootControl.c](IMCA/Task/ShootControl.c)）
+
+- 两摩擦轮对转，目标转速由裁判系统热量限制动态计算
+- PC模式下仅高位开启摩擦轮，RC模式下关闭
+
+### 8.2 拨弹轮控制
+
+- **单发**：鼠标左键单击（hold_cnt: 10~300ms）
+- **连发**：鼠标左键长按（hold_cnt > 300ms）
+- **热量保护**：根据裁判系统热量数据动态调整射速，热量过高时停止发射
+- **堵转保护**：电流 > 8000mA 持续超时自动反转清除卡弹
+
+---
+
+## 9. 云台升降限位状态机
+
+升降机构通过两个 GPIO 限位开关检测High/Low位置（[ControlTask.c](IMCA/Task/ControlTask.c) — `LiftLowerControl()`）：
+
+```
+         ┌─────────┐
+    ┌───→│  High   │←───┐
+    │    └────┬────┘    │
+    │  限位释放(num次)    │限位触发(num次)
+    │    ┌────┴────┐    │
+    └────│ Middle  │────┘
+         └────┬────┘
+        限位触发│限位释放
+         ┌────┴────┐
+         │   Low   │
+         └─────────┘
+```
+
+- **进入阈值**（`HEIGHT_STATE_ENTER_TICKS = 10`）：Middle→High/Low 需连续触发10次
+- **退出阈值**（`HEIGHT_STATE_EXIT_TICKS = 10`）：High/Low→Middle 需连续释放10次
+- 两个限位同时有效时保持Middle，避免异常接线误判
+
+---
+
+## 10. 通信协议
+
+### 10.1 MiniPC 视觉通信（[Vision_interact.h](IMCA/Tool/Vision_interact.h)）
+
+**发送（机器人→MiniPC，32字节）：**
+- 四元数姿态 q[4]、Yaw角度、Yaw角速度、Pitch角度、颜色信息
+
+**接收（MiniPC→机器人，27字节）：**
+- 瞄准目标 Yaw/Pitch 角度及角速度/角加速度、开火标志位
+
+### 10.2 裁判系统（串口3, [Judge_interact.h](IMCA/Judge/Judge_interact.h)）
+
+- 接收：血量、热量上限/当前/冷却、伤害来源ID/类型、比赛阶段等
+- 发送：UI 绘制指令到裁判系统操作手界面
+
+### 10.3 VT 上位机（LPUART1）
+
+PC模式下的虚拟遥控器协议，结构与RC遥控器一致，键鼠数据通过串口发送到机器人。
+
+---
+
+## 11. 关键安全机制
+
+| 机制 | 位置 | 说明 |
+|------|------|------|
+| 遥控器丢信号 | `MotorWatchdogMonitor()` | RC超时自动切为LOSE模式，停止所有电机 |
+| 电机超时检测 | `GetMotorMeasureNew()` — `Timeout_Flag` | 每收到一帧CAN数据递增，看门狗定期清零并检测 |
+| DM电机堵转检测 | `ChassisControlSetValue()` | YAW扭矩 > 9 持续 400ms 触发小陀螺反转 |
+| 升降堵转保护 | `GimbalControlSetValue()` | Height电流 > 8000mA 持续 50ms 停止升降 |
+| 拨弹堵转保护 | `PluckControl()` | 拨弹电流 > 8000mA 持续 200ms 反转清除 |
+| 摩擦轮低转速禁射 | `TotalControlSetValue()` | 摩擦轮 < 4000rpm 时禁止拨弹（防止尿弹） |
+| 组合键复位 | `ResetTask()` | Ctrl+R 触发 NVIC 系统复位 |
+| 裁判系统复活检测 | `CtrlModeSelect()` | 检测 RoboHP 从0变1做复活后延时处理 |
+
+---
+
+## 12. 调试工具
+
+- **Vofa+**：[Vofa_send.c](IMCA/Tool/Vofa_send.c) 通过串口发送调试波形数据到 Vofa+ 上位机显示
+- **USB-CDC**：虚拟串口用于日志输出和参数调试
+- **裁判系统UI**：[UI.c](IMCA/Judge/UI.c) 在比赛操作界面上绘制自定义UI元素
+
+---
+
+## 13. 构建与开发
+
+### 环境要求
+- **IDE**: CLion 或 VSCode + CMake
+- **编译器**: arm-none-eabi-gcc (ARM GNU Toolchain)
+- **构建系统**: CMake 3.28+
+- **HAL配置**: STM32CubeMX (.ioc 文件: `G474_Example.ioc`)
 
 
 ---
 
-英文版说明见本文档上方原始内容；如需补充模块关系图或在 README 中加入跳转链接到具体函数，请告诉我，我可以继续完善。
+## 14. 配置宏说明
+
+全局配置宏定义在 [user_lib.h](IMCA/User/user_lib.h)：
+
+| 宏 | 默认值 | 说明 |
+|----|--------|------|
+| `IMU_UPDATA` | 1 | 是否启用 IMU 姿态更新 |
+| `INFANTRY` | 1 | 兵种：步兵 |
+| `CHASSIS_MAXSPEED` | 动态 | 底盘最大速度，功率35W时限速3500rpm，否则6000rpm |
+| `GPIO_DEBOUNCE_TICKS` | 10 | 按键消抖采样周期数 |
+| `HEIGHT_STATE_ENTER_TICKS` | 10 | 限位进入阈值 |
+| `HEIGHT_STATE_EXIT_TICKS` | 10 | 限位退出阈值 |
