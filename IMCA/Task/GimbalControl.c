@@ -24,10 +24,11 @@ float D_speed_yaw,gyrosc_speed;
 float D_speed_pitch;
 float vision_pitch = 0;
 float vision_yaw = 0;
-
+uint16_t Stuck_Hight_cnt = 0;
+uint8_t Stuck_Hight_flag = 0;
 // 高低位动作标志：0-空闲，1-执行到High，2-执行到Low
 uint8_t highlow_flag = 0;
-
+int32_t High_Low_Start_angle = 0;
 void GimbalInit(void)
 {
     static uint16_t Gimbal_Init_count = 0;
@@ -83,7 +84,7 @@ void GimbalControlSetValue(void) {
                 xMotorParam[PITCH].EcoTar -= RcDeadlineLimit(CH4,25)*0.000008;
                 xMotorParam[YAW].ImuTar    -= RcDeadlineLimit(CH3,25)*0.0008;
         }else {
-            xMotorParam[PITCH].EcoTar=0.0f;
+            // xMotorParam[PITCH].EcoTar=-0f;
             if (xMotorParam[YAW].FeedbackMode == ImuFeedback) {
                 xMotorParam[YAW].EcoTar    =Gimbal_FrontAngle;
                 xMotorParam[YAW].FeedbackMode = EcoFeedback;
@@ -91,12 +92,11 @@ void GimbalControlSetValue(void) {
 
         }
         //				xMotorParam[PITCH].ImuTar += RcDeadlineLimit(CH4,25)*0.0005;
-
-       if (CH5 < -500&&Gimbal_Height_flag!=High&&xRobotMode.ChassisMode ==CHASSIS_FOLLOW) {
+        if (CH5 < -500&&Gimbal_Height_flag!=High&&xRobotMode.ChassisMode ==CHASSIS_FOLLOW) {
            xMotorParam[Height].EcoTar=-5000.0f;
        }else if (CH5 >500&&Gimbal_Height_flag!=Low&&xRobotMode.ChassisMode ==CHASSIS_FOLLOW){
            xMotorParam[Height].EcoTar=5000.0f;
-           xMotorParam[PITCH].EcoTar=-0.017f;
+           xMotorParam[PITCH].EcoTar=-0.23f;
        }else{
            xMotorParam[Height].EcoTar=0.0f;
        }
@@ -116,7 +116,7 @@ void GimbalControlSetValue(void) {
         if(xRobotMode.GimbalMode == NOSHOOT_MODE || xRobotMode.GimbalMode == NORMAL_MODE)
         {
             // 右键/拨杆/快捷键触发自瞄通道
-            if(mouse_right.deshake_key||(CH5 >500)||KEY_V)
+            if ((mouse_right.deshake_key||(CH5 >500)||KEY_V)&&Gimbal_Height_flag==High)
             {
                 // AUTO_Shoot_flag = 2;
                 if(xMotorParam[PITCH].FeedbackMode == EcoFeedback) {
@@ -192,26 +192,47 @@ void GimbalControlSetValue(void) {
                 // 仅在底盘跟随模式下允许升降动作
                 if (xRobotMode.ChassisMode ==CHASSIS_FOLLOW) {
                     // SHIFT+X 触发上升，触发后保持输出直到检测到 High 到位
-                    static uint16_t  highlow_Init_flag= 0;
+                    static uint16_t  highlow_Init_cnt= 0;
+                    if (ABS(xMotorParam[Height].MeasureEco->real_current)>8000) {
+                        Stuck_Hight_cnt ++;
+                        if(Stuck_Hight_cnt >50)
+                        {
+                            Stuck_Hight_flag=1;
+                            xMotorParam[Height].EcoTar=0.0f;
+                            Stuck_Hight_cnt = 0;
+                            highlow_flag=0;
+                        }
+                    }else {
+                        Stuck_Hight_cnt = 0;
+                    }
+                    //上升
                     if (KEY_SHIFT&&KEY_X&&Gimbal_Height_flag!=High) {
-
+                        if (Stuck_Hight_flag==0) {
+                            High_Low_Start_angle=xMotorParam[Height].MeasureEco->total_angle;
+                        }
                         highlow_flag=1;
                     }else if (highlow_flag==1) {
-                        // if (ABS(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle) <= 0.5f) {
+
+                        if (ABS(High_Low_Start_angle-xMotorParam[Height].MeasureEco->total_angle) >2200000) {
+                            // 如果长时间未检测到高位到达，强制停止升降，避免过流损伤
+                            xMotorParam[Height].EcoTar=-5000.0f;
+                        }else {
                             xMotorParam[Height].EcoTar=-20000.0f;
-                        // }else {
-                        //     xMotorParam[Height].EcoTar=0.0f;
-                        // }
+                        }
                         if (Gimbal_Height_flag==High) {
-                            // 到位后立即停止，清空动作标志                            xMotorParam[Height].EcoTar=0.0f;
+                            Stuck_Hight_flag=0;
                             xMotorParam[Height].EcoTar=0.0f;
                             highlow_flag=0;
                         }
 
                     }
-
+                    //下降
                     if (KEY_SHIFT&&KEY_C&&Gimbal_Height_flag!=Low) {
-                        xMotorParam[PITCH].EcoTar=0.0f;
+                        // xMotorParam[PITCH].EcoTar=0.0f;
+                        if (Stuck_Hight_flag==0) {
+                            High_Low_Start_angle=xMotorParam[Height].MeasureEco->total_angle;
+                        }
+                        xMotorParam[PITCH].EcoTar=-0.23f;
                         Gimbal_FOLLOWANGLE=Gimbal_FrontAngle;
                         // if (xMotorParam[YAW].FeedbackMode == ImuFeedback) {
                         //     xMotorParam[YAW].EcoTar    =Gimbal_FrontAngle;
@@ -221,16 +242,24 @@ void GimbalControlSetValue(void) {
                         highlow_flag=2;
                     }else if (highlow_flag==2) {
                         if (ABS(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle) <= 1.0f) {
-                            highlow_Init_flag++;
-                            if (highlow_Init_flag>=50) {
-                                highlow_Init_flag=0;
-                                xMotorParam[Height].EcoTar=20000.0f;
+                            highlow_Init_cnt++;
+                            if (highlow_Init_cnt>=50) {
+                                highlow_Init_cnt=0;
+                                if (ABS(High_Low_Start_angle-xMotorParam[Height].MeasureEco->total_angle) >2100000) {
+                                    // 如果长时间未检测到高位到达，强制停止升降，避免过流损伤
+                                    xMotorParam[Height].EcoTar=5000.0f;
+                                }else {
+                                    xMotorParam[Height].EcoTar=20000.0f;
+                                }
+
                             }
                         }else {
                             xMotorParam[Height].EcoTar=0.0f;
                         }
+
                         if (Gimbal_Height_flag==Low) {
                             // 到位后立即停止，清空动作标志
+                            xMotorParam[PITCH].EcoTar=-0.0f;
                             xMotorParam[Height].EcoTar=0.0f;
                             highlow_flag=0;
                         }
@@ -246,13 +275,13 @@ void GimbalControlSetValue(void) {
                             xMotorParam[YAW].ImuTar=xMotorParam[YAW].MeasureImu->total_angle;
                             xMotorParam[YAW].FeedbackMode = ImuFeedback;
                         }
-                        xMotorParam[YAW].ImuTar   -= MOUSE_X *50*0.00004f;
+                        xMotorParam[YAW].ImuTar   -= MOUSE_X *50*0.00008f;
                         xMotorParam[PITCH].EcoTar -= MOUSE_Y*50*0.0000008f;
                         // xMotorParam[PITCH].EcoTar -= RcDeadlineLimit(CH4,25)*0.000008;
                         // xMotorParam[YAW].ImuTar    -= RcDeadlineLimit(CH3,25)*0.0008;
                     }else {
                         // 非高位时限制俯仰并切回Eco反馈
-                        xMotorParam[PITCH].EcoTar=0.0f;
+                        // xMotorParam[PITCH].EcoTar=0.0f;
                         if (xMotorParam[YAW].FeedbackMode == ImuFeedback) {
                             xMotorParam[YAW].EcoTar    =Gimbal_FrontAngle;
                             xMotorParam[YAW].FeedbackMode = EcoFeedback;
@@ -273,11 +302,7 @@ void GimbalControlSetValue(void) {
     }
     xMotorParam[PITCH].EcoTar = AngleLimit(xMotorParam[PITCH].EcoTar, 0.34, -0.65);
     xMotorParam[PITCH].ImuTar = AngleLimit(xMotorParam[PITCH].ImuTar, 18, -37);
-    if(xMotorParam[PITCH].EcoTar<0.0005f && xMotorParam[PITCH].EcoTar>(-0.0005f))
-    {
-        // 小范围死区归零，减少电机抖动
-        xMotorParam[PITCH].EcoTar = 0;
-    }
+
 }
 
 

@@ -103,7 +103,7 @@ extern float matrix_value2;
 
 extern first_order_filter_type_t xChassisCmdSlowSetVx;
 extern first_order_filter_type_t xChassisCmdSlowSetVy;
-
+extern first_order_filter_type_t xChassisCmdSlowSetVw;
 void   kalman_filter_init(kalman_filter_t *F, kalman_filter_init_t *I);
 float *kalman_filter_calc(kalman_filter_t *F, float signal1, float signal2);
 

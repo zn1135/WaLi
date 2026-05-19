@@ -22,8 +22,8 @@ typedef struct
 	uint32_t figure_tpye:3;
 	uint32_t layer:4;
 	uint32_t color:4;
-	uint32_t details_a:9;
-	uint32_t details_b:9;
+	int32_t details_a:9;
+	int32_t details_b:9;
 	uint32_t width:10;
 	uint32_t start_x:11;
 	uint32_t start_y:11;

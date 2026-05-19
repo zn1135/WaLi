@@ -12,6 +12,7 @@
 #include "IMU_Task.h"
 #include "Judge_interact.h"
 #include "math.h"
+#include "RcTask.h"
 #include "usbd_cdc_if.h"
 #include "user_lib.h"
 
@@ -43,7 +44,20 @@ void MiniPC_SendVisionFrameInfo(MiniPC_SendPacket_Typedef *SendPacket)
     {
         MiniPC_SendPacket.q[i] = receive_imusol.quat[i];
     }
-    MiniPC_SendPacket.mode=0;//0不打  1自瞄 2大符
+    if(mouse_right.deshake_key)
+    {
+        MiniPC_SendPacket.mode = 1;
+    }
+    else if (KEY_V&&KEY_CTRL)
+    {
+        MiniPC_SendPacket.mode = 3;
+    }
+    else if (KEY_V)
+    {
+        MiniPC_SendPacket.mode = 2;
+    }
+
+    else MiniPC_SendPacket.mode = 0;
     MiniPC_SendPacket.yaw = IMU_Yaw.angle *PI/180;
     MiniPC_SendPacket.yaw_vel = IMU_Yaw.speed_gyro;
     //	MiniPC_SendPacket.yaw = xMotorParam[YAW].MeasureDM->position;

@@ -57,6 +57,8 @@ typedef struct
 
 
 extern float chassis_vx_channel , chassis_vy_channel , chassis_vw_channel ;
+extern uint16_t Stuck_YAW_cnt;
+extern int GYROSC_direction;
 void ChassisControlSetValue(void);
 void ChassisControl_Calculating(void);
 float ChassisRotationPID(float measure, float target);

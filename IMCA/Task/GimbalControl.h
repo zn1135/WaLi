@@ -14,5 +14,6 @@ extern float pitch_pos,pitch_acc,pitch_vel,pitch_output;
 extern float D_speed_yaw,gyrosc_speed;
 extern float vision_pitch, vision_yaw;
 extern uint8_t highlow_flag ;
-
+extern uint16_t Stuck_Hight_cnt;
+extern int32_t High_Low_Start_angle;
 #endif //GIMBALCONTROL_H

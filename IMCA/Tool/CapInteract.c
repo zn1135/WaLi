@@ -2,6 +2,7 @@
 #include "Judge_interact.h"
 #include "CanBus_Task.h"
 #include "fdcan.h"
+#include "RcTask.h"
 
 
 cap_measure_t Cap_Measure = {.buffer_mode =0x02};
@@ -20,7 +21,15 @@ uint8_t shut_cap_switch;
 void PowerSend(void)
 {
 	uint8_t chassis_power_buffer=Chassis_power_buffer();
-	uint8_t power_limit=send_chassis_power_limit();
+	uint8_t power_limit=0;
+	if (KEY_SHIFT) {
+		power_limit=10.0;
+	}else {
+		power_limit=send_chassis_power_limit();
+	}
+
+
+
 	SendCapPowerData(&hfdcan3, Cap_Measure.buffer_mode,power_limit,chassis_power_buffer,0x00,0x00);
 }
 void PowerSend_Cmd(uint8_t cmd,uint8_t cmd_val)

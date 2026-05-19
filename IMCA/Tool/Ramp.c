@@ -14,6 +14,7 @@ first_order_filter_type_t mouse_x;
 first_order_filter_type_t mouse_y;
 first_order_filter_type_t xChassisCmdSlowSetVx;
 first_order_filter_type_t xChassisCmdSlowSetVy;
+first_order_filter_type_t xChassisCmdSlowSetVw;
 // 矩阵值变量
 float matrix_value1;
 float matrix_value2;

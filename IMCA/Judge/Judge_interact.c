@@ -244,6 +244,15 @@ float My_y(void)
     return Rec_game_robot_pos.y;
 }
 
+uint8_t send_robot_hurt_id() {
+    return Rec_robot_hurt.armor_id;
+}
+
+uint8_t send_robot_hurt_type() {
+    return Rec_robot_hurt.hurt_type;
+}
+
+
 uint8_t RobotAimColor(void)
 {
     uint8_t aim_color;
@@ -331,6 +340,10 @@ void SetControlParameter(void)
                 Key_Set.ctrl_speed = 3.5f;}break;
     }
 }
+
+
+
+
 
 /*
 2024

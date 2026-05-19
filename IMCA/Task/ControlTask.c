@@ -12,6 +12,7 @@
 #include "Vofa_send.h"
 #include "RcTask.h"
 #include "ChassisControl.h"
+#include "cmsis_os2.h"
 #include "fdcan.h"
 #include "FreeRTOS.h"
 #include "GimbalControl.h"
@@ -40,9 +41,9 @@ robot_mode_t xRobotMode;
 uint8_t Gimbal_Init_Flag = 0;
 uint8_t DM_again_flag = 0;
 uint8_t aRxBuffer1[150];
-uint8_t Gimbal_Height_flag = 0;
+uint8_t Gimbal_Height_flag = High;
 uint8_t cnt=0;
-
+uint8_t fh=0;
 #define GPIO_DEBOUNCE_MAX_ITEMS 16U // 最多支持的GPIO消抖通道数
 
 #if (GPIO_DEBOUNCE_TICKS < 5U)
@@ -112,8 +113,10 @@ void TotalInitTask(void) {
     PidInit(); //pid初始化
     const static float chassis_x_order_filter[1] = {CHASSIS_ACCEL_X_NUM};
     const static float chassis_y_order_filter[1] = {CHASSIS_ACCEL_Y_NUM};
+    const static float chassis_w_order_filter[1] = {CHASSIS_ACCEL_W_NUM};
     FirstOrderFilterInit(&xChassisCmdSlowSetVx, CHASSIS_CONTROL_TIME, chassis_x_order_filter);
     FirstOrderFilterInit(&xChassisCmdSlowSetVy, CHASSIS_CONTROL_TIME, chassis_y_order_filter);
+    FirstOrderFilterInit(&xChassisCmdSlowSetVw, CHASSIS_CONTROL_TIME, chassis_w_order_filter);
     // VBatSense_Init(&hadc3, &cfg);
     ADC_handle_Init();
 }
@@ -147,7 +150,15 @@ void TotalControl(void) {
     //               send_chassis_power_limit() , //6
     //                Chassis_power_buffer()
     // );
-
+    // Vofa_Send_Data8( xMotorParam[FRICTR].MeasureEco->speed_rpm,//0
+    //           xMotorParam[FRICTL].MeasureEco->speed_rpm, //1
+    //           FireSpeed(), //2
+    //           xMotorParam[PITCH].MeasureImu->angle , //3
+    //           xMotorParam[YAW].ImuTar, //4
+    //           xMotorParam[YAW].MeasureImu->total_angle, //5
+    //           xMotorParam[PITCH].EcoTar, //6
+    //           Chassis_Rotate.pos_out
+    // );
     // Vofa_Send_Data8(Gimbal_Height_flag,//0
     //             xMotorParam[Height].EcoTar, //1
     //             xRobotMode.ChassisMode , //2
@@ -159,11 +170,11 @@ void TotalControl(void) {
     // );xMotorParam[WHEEL_FR].Timeout_Flag
     //
     // Vofa_Send_Data16(
-    //     xMotorParam[FRICTR].MeasureEco->speed_rpm, //0
-    //     xMotorParam[FRICTL].MeasureEco->speed_rpm,//1
+    //     xMotorParam[PLUCK].MeasureEco->speed_rpm, //0
+    //     xMotorParam[PLUCK].EcoTar,//1
     //     FireSpeed(),//2
-    //     VT_control.ch4,//3
-    //     VT_control._switch,//4
+    //     xMotorParam[FRICTR].MeasureEco->speed_rpm,//3
+    //     xMotorParam[FRICTL].MeasureEco->speed_rpm,//4
     //     VT_control.PauseButton,//5
     //     VT_control.Custom_leftKey,//6
     //     VT_control.Custom_rightKey,//7
@@ -178,53 +189,66 @@ void TotalControl(void) {
     // );
     HAL_ADC_Start(&hadc1);
     HAL_ADC_Start(&hadc3);
-//     Vofa_Send_Data8(xRobotMode.ChassisMode,//0
-//                arm_sin_f32(xRelativeAngle.receive_yaw_relative_rad), //1
-//               arm_cos_f32(xRelativeAngle.receive_yaw_relative_rad), //2
-//                 xMotorParam[YAW].ImuTar , //3
-//               KEY_SHIFT&&KEY_C, //4
-//              // highlow_flag, //5
-//               // ABS(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle), //6
-//               // HAL_GetTick(),
-//               hadc1.Instance->DR,
-//               hadc3.Instance->DR,
-//               adc1_value[0]
+//      Vofa_Send_Data8(xMotorParam[FRICTR].MeasureEco->speed_rpm,//0
+//               xMotorParam[FRICTL].MeasureEco->speed_rpm, //1
+//              xMotorParam[FRICTR].EcoTar , //2
+//                FireSpeed(), //3
+//               xMotorParam[Height].EcoTar, //4
+//               // highlow_flag, //5
+//                // ABS(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle), //6
+//                // HAL_GetTick(),
+//                Chassis_Power.pos_out ,
+//               Cap_Measure.cap_value,
+//                sqrt((chassis_vx_channel*chassis_vx_channel+chassis_vy_channel*chassis_vy_channel))/CHASSIS_MAXSPEED
 // );
-    // Vofa_Send_Data8(MiniPC_ReceivePacket.yaw/PI*180 ,//0
-    //                 xMotorParam[YAW].MeasureImu->angle, //1
-    //                MiniPC_ReceivePacket.yaw_vel/PI*180 , //2
-    //                 xMotorParam[YAW].MeasureImu->palstance , //3
-    //                 xMotorParam[YAW].CurrentOutput, //4
-    //                 MiniPC_ReceivePacket.fireflag, //5
-    //                xMotorParam[PLUCK].MeasureEco->speed_rpm, //6
-    //                FireSpeed()
-    // );
+//     Vofa_Send_Data8(Cap_Measure.battary_power,//0
+//           Cap_Measure.chassis_power, //1
+//           Cap_Measure.cap_power, //2
+//            Cap_Measure.cap_value, //3
+//         Cap_Measure.state_core, //4
+//          // highlow_flag, //5
+//           // ABS(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle), //6
+//           // HAL_GetTick(),
+//           xMotorParam[YAW].MeasureDM->torque,
+//           xMotorParam[YAW].CurrentOutput,
+//           sqrt((chassis_vx_channel*chassis_vx_channel+chassis_vy_channel*chassis_vy_channel))/CHASSIS_MAXSPEED
+// );
+    Vofa_Send_Data8(send_robot_hurt_id() ,//0
+                  send_robot_hurt_type(), //1
+                   xMotorParam[PITCH].MeasureImu->palstance , //2
+                    xMotorParam[YAW].MeasureImu->palstance , //3
+                    xMotorParam[YAW].CurrentOutput, //4.
+                  xMotorParam[YAW].MeasureDM->velocity-xMotorParam[YAW].MeasureDM->last_v, //5
+                  xMotorParam[YAW].MeasureDM->velocity, //6
+                  Stuck_YAW_cnt
+    );
     // Vofa_Send_Data8(-MiniPC_ReceivePacket.pitch,//0
     //                 xMotorParam[PITCH].MeasureImu->angle, //1
     //                  xMotorParam[PITCH].TempCalc  , //2
     //                 xMotorParam[PITCH].MeasureImu->palstance, //3
     //                 xMotorParam[PITCH].CurrentOutput,//4
     //                 IMU_Pitch.speed_gyro/180*PI, //5
-    //                 xMotorParam[PITCH].MeasureDM->velocity, //6
-    //                 MiniPC_ReceivePacket.fireflag //7
+    //                 xMotorParam[YAW].ImuTar-xMotorParam[YAW].MeasureImu->total_angle, //6
+    //                 Stuck_YAW_cnt //7
     // );
-    Vofa_Send_Data16(xMotorParam[WHEEL_FR].MeasureEco->speed_rpm,//0
-                    xMotorParam[WHEEL_FL].MeasureEco->speed_rpm  , //1
-                    xMotorParam[WHEEL_BR].MeasureEco->speed_rpm , //2
-                    xMotorParam[WHEEL_BL].MeasureEco->speed_rpm, //3
-                    xMotorParam[WHEEL_FR].EcoTar,//4
-                    xMotorParam[WHEEL_FL].EcoTar, //5
-                    xMotorParam[WHEEL_BR].EcoTar, //6
-                    xMotorParam[WHEEL_BL].EcoTar, //7
-                    xMotorParam[WHEEL_FR].Output_ratio,
-                    xMotorParam[WHEEL_FL].Output_ratio,
-                    xMotorParam[WHEEL_BR].Output_ratio,
-                    xMotorParam[WHEEL_BL].Output_ratio,
-                    xMotorParam[YAW].MeasureDM->position,
-                    xMotorParam[PITCH].MeasureDM->position,
-                    0,
-                    0
-    );
+    // Vofa_Send_Data16(xMotorParam[WHEEL_FR].MeasureEco->speed_rpm,//0
+    //                 xMotorParam[WHEEL_FL].MeasureEco->speed_rpm  , //1
+    //                 xMotorParam[WHEEL_BR].MeasureEco->speed_rpm , //2
+    //                 xMotorParam[WHEEL_BL].MeasureEco->speed_rpm, //3
+    //                 xMotorParam[WHEEL_FR].EcoTar,//4
+    //                 xMotorParam[WHEEL_FL].EcoTar, //5
+    //                 xMotorParam[WHEEL_BR].EcoTar, //6
+    //                 xMotorParam[WHEEL_BL].EcoTar, //7
+    //                 xMotorParam[WHEEL_FR].CurrentOutput,
+    //                 xMotorParam[WHEEL_FL].CurrentOutput,
+    //                 xMotorParam[WHEEL_BR].CurrentOutput,
+    //                 xMotorParam[WHEEL_BL].CurrentOutput,
+    //                 xMotorParam[WHEEL_FR].PidParamSpdEco->pos_out,
+    //                 xMotorParam[WHEEL_FL].PidParamSpdEco->pos_out,
+    //                 xMotorParam[WHEEL_BR].PidParamSpdEco->pos_out,
+    //                 xMotorParam[WHEEL_BL].PidParamSpdEco->pos_out
+    //
+    // );
     //
 
 
@@ -232,9 +256,15 @@ void TotalControl(void) {
 
 
 void CtrlModeSelect(void) {
+
     if (RoboHP()==0) {
         xRobotMode.ChassisMode = CHASSIS_FOLLOW;
+        fh=1;
+        // LiftLowerControl();
         // Gimbal_Init_Flag=0;
+    }else if (fh==1) {
+        osDelay(100);
+        fh=0;
     }
         if (RC_UPPER_LEFT_SW_UP) {
             xRobotMode.CtrlMode = PC;
@@ -287,10 +317,15 @@ void TotalControlSetValue(void) {
     if (!Gimbal_Init_Flag) {
         GimbalInit();
     } else if (Gimbal_Init_Flag) {
-        LiftLowerControl();
+        if(ABS(CH5)>500||highlow_flag!=0) {
+            LiftLowerControl();
+        }
         GimbalControlSetValue();
         ShootControlSetValue();
-        PluckControl();
+        if (ABS(xMotorParam[FRICTR].MeasureEco->speed_rpm)>4000&&ABS(xMotorParam[FRICTL].MeasureEco->speed_rpm)>4000) {
+            PluckControl();
+        }
+
         ChassisControlSetValue();
         ChassisControl_Calculating();
         PidCalc();

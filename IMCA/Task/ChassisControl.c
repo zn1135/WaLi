@@ -6,6 +6,8 @@
 #include "user_lib.h"
 #include "Ramp.h"
 #include "GimbalControl.h"
+#include "judge_interact.h"
+#include "Vision_interact.h"
 float chassis_vx_channel = 0, chassis_vy_channel = 0, chassis_vw_channel = 0;
 chassis_t Chassis;
 
@@ -14,9 +16,9 @@ float ChassisRotationPID(float measure, float target) {
     return Chassis_Rotate.pos_out;
 }
 
-
-
-void ChassisControlSetValue(void) {
+uint16_t Stuck_YAW_cnt=0;
+int GYROSC_direction=-1;
+void  ChassisControlSetValue(void) {
 
     GetGimbalFrontBackOrientation(&xMotorParam[YAW]);
 
@@ -47,7 +49,22 @@ void ChassisControlSetValue(void) {
         } else if (xRobotMode.ChassisMode == CHASSIS_GYROSC) {
             chassis_vy_channel = -(float) RcDeadlineLimit(CH2, 10) / 660*CHASSIS_MAXSPEED;
             chassis_vx_channel = (float) RcDeadlineLimit(CH1, 10) / 660*CHASSIS_MAXSPEED;
-            chassis_vw_channel = 7000.0f;
+
+            if (ABS(xMotorParam[YAW].MeasureDM->torque)>9&&!mouse_right.deshake_key)
+            {
+                Stuck_YAW_cnt ++;
+                if(Stuck_YAW_cnt >400)
+                {
+                    Stuck_YAW_cnt = 0;
+                    xMotorParam[YAW].ImuTar = xMotorParam[YAW].MeasureImu ->total_angle ;
+                    GYROSC_direction *= -1;
+                }
+            }else {
+                Stuck_YAW_cnt = 0;
+            }
+
+
+            chassis_vw_channel = CHASSIS_MAXSPEED*GYROSC_direction;
         }
     } else if (xRobotMode.CtrlMode == PC) {
 
@@ -64,22 +81,6 @@ void ChassisControlSetValue(void) {
             xRobotMode.ChassisMode = CHASSIS_FOLLOW;
         }
 
-
-        if (xRobotMode.ChassisMode == CHASSIS_SEPARA) {
-
-
-        } else if (xRobotMode.ChassisMode == CHASSIS_FOLLOW) {
-            if (Gimbal_Height_flag==High) {
-                chassis_vw_channel = -ChassisRotationPID(xMotorParam[YAW].MeasureDM->position, Gimbal_FOLLOWANGLE);
-            }else {
-                chassis_vw_channel = ChassisRotationPID(xMotorParam[YAW].MeasureImu->total_angle, xMotorParam[YAW].ImuTar);//todo  10
-            }
-
-            // chassis_vw_channel = -ChassisRotationPID(xMotorParam[YAW].MeasureDM->position, -0.017f);
-        } else if (xRobotMode.ChassisMode == CHASSIS_GYROSC) {
-
-            chassis_vw_channel = 8000.0f;
-        }
         if (xRobotMode.ChassisMode == CHASSIS_FOLLOW||xRobotMode.ChassisMode == CHASSIS_SEPARA) {
             if (KEY_W) {
                 chassis_vy_channel = -CHASSIS_MAXSPEED;
@@ -117,11 +118,37 @@ void ChassisControlSetValue(void) {
                 chassis_vx_channel=0;
             }
         }
+        if (xRobotMode.ChassisMode == CHASSIS_SEPARA) {
 
-        if (KEY_CTRL) {
-            chassis_vy_channel*=1.2f;//2.0f
-            chassis_vx_channel*=1.2f;//2.0
+
+        } else if (xRobotMode.ChassisMode == CHASSIS_FOLLOW) {
+            if (Gimbal_Height_flag==High) {
+                chassis_vw_channel = -ChassisRotationPID(xMotorParam[YAW].MeasureDM->position, Gimbal_FOLLOWANGLE);
+            }else {
+                chassis_vw_channel = ChassisRotationPID(xMotorParam[YAW].MeasureImu->total_angle, xMotorParam[YAW].ImuTar);//todo  10
+            }
+
+            // chassis_vw_channel = -ChassisRotationPID(xMotorParam[YAW].MeasureDM->position, -0.017f);
+        } else if (xRobotMode.ChassisMode == CHASSIS_GYROSC) {
+
+            if (ABS(xMotorParam[YAW].MeasureDM->torque)>9&&!mouse_right.deshake_key)
+            {
+                Stuck_YAW_cnt ++;
+                if(Stuck_YAW_cnt >400)
+                {
+                    Stuck_YAW_cnt = 0;
+                    xMotorParam[YAW].ImuTar = xMotorParam[YAW].MeasureImu ->total_angle ;
+                    GYROSC_direction *= -1;
+                }
+            }else {
+                Stuck_YAW_cnt = 0;
+            }
+
+            chassis_vw_channel = (CHASSIS_MAXSPEED-sqrt((chassis_vx_channel*chassis_vx_channel+chassis_vy_channel*chassis_vy_channel)))*GYROSC_direction;
         }
+
+
+
 
     }
     if (xRobotMode.ChassisMode == CHASSIS_FOLLOW) {
@@ -130,8 +157,15 @@ void ChassisControlSetValue(void) {
     }
     FirstOrderFilterCali(&xChassisCmdSlowSetVx, chassis_vx_channel);//一阶低通滤波
     FirstOrderFilterCali(&xChassisCmdSlowSetVy, chassis_vy_channel);//一阶低通滤波
+    // FirstOrderFilterCali(&xChassisCmdSlowSetVw, chassis_vw_channel);//一阶低通滤波
     // xChassisCmdSlowSetVx.out=chassis_vx_channel;
     // xChassisCmdSlowSetVy.out=chassis_vy_channel;
+    xChassisCmdSlowSetVw.out=chassis_vw_channel;
+    if (KEY_CTRL) {
+        chassis_vx_channel*=1.2;
+        chassis_vy_channel*=1.2;
+    }
+
 
 }
 
@@ -164,7 +198,7 @@ void ChassisControl_Calculating(void) {
                 Chassis.car_vy=xChassisCmdSlowSetVy.out*arm_cos_f32(xRelativeAngle.receive_yaw_relative_rad);
             }
 
-            Chassis.car_vw=chassis_vw_channel;
+            Chassis.car_vw=xChassisCmdSlowSetVw.out;
             xMotorParam[WHEEL_FR].EcoTar = -(Chassis.car_vx + Chassis.car_vy + Chassis.car_vw);
             xMotorParam[WHEEL_FL].EcoTar = -Chassis.car_vx + Chassis.car_vy - Chassis.car_vw;
             xMotorParam[WHEEL_BR].EcoTar = -(-Chassis.car_vx + Chassis.car_vy+Chassis.car_vw);
@@ -177,7 +211,7 @@ void ChassisControl_Calculating(void) {
             cos_rotate = arm_cos_f32((xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle)/180*PI);
             Chassis.car_vx=(sin_rotate*xChassisCmdSlowSetVy.out+cos_rotate*xChassisCmdSlowSetVx.out);
             Chassis.car_vy=(cos_rotate*xChassisCmdSlowSetVy.out-sin_rotate*xChassisCmdSlowSetVx.out);
-            Chassis.car_vw=chassis_vw_channel;
+            Chassis.car_vw=xChassisCmdSlowSetVw.out;
             xMotorParam[WHEEL_FR].EcoTar = -(Chassis.car_vx + Chassis.car_vy + Chassis.car_vw);
             xMotorParam[WHEEL_FL].EcoTar = -Chassis.car_vx + Chassis.car_vy - Chassis.car_vw;
             xMotorParam[WHEEL_BR].EcoTar = -(-Chassis.car_vx + Chassis.car_vy + Chassis.car_vw);

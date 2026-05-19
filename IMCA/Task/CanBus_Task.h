@@ -9,7 +9,10 @@
 #include "main.h"
 
 
+void set_DM_J4310_MIT_info(FDCAN_HandleTypeDef *hcan,
 
+                            uint16_t id, float _pos, float _vel,
+                            float _KP, float _KD, float _torq);
 void CANFilterInit(void);
 void set_DM_J4310_motor_State(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t function);
 void SetCanFronMotorValue(FDCAN_HandleTypeDef *hcan, int16_t iq1, int16_t iq2, int16_t iq3, int16_t iq4);

@@ -433,5 +433,6 @@ void SetControlParameter(void); // 根据功率上限设置控制参数
 void N_SetControlParameter(void);
 uint8_t Judge_Read(uint8_t* RcUsartData);
 void HAL_UART4_Receive_IT_IDLE(void); // Uart4 空闲中断 + DMA 使能
-
+uint8_t send_robot_hurt_id();
+uint8_t send_robot_hurt_type();
 #endif

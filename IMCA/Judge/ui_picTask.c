@@ -9,6 +9,8 @@
 #include "ControlTask.h"
 #include "arm_math.h"
 #include "cmsis_os.h"
+#include "UartTask.h"
+#include "Vision_interact.h"
 
 /*文件说明：这里放打包好的UI结构体*/
 
@@ -22,7 +24,7 @@ ext_robot_interact_data_t  UIdata_Header;
 jianshu_t jianshu;
 interaction_figure_7t Line;
 ext_client_custom_graphic_character_t  character;
-
+uint8_t UI_cnt=0;
 
 
 void ChassisGuidance(uint16_t circle_point_x,uint16_t circle_point_y,uint8_t Radius)  //底盘指向指南针
@@ -54,6 +56,7 @@ void UI_TEST(uint8_t operate_)
     }
 
     /*帧头 5byte*/
+
     Tx_Header.Sof = 0xA5;
     Tx_Header.Seq = seq++;
     Tx_Header.Data_length = 111;//sizeof(UIdata_Header) + sizeof(UI_CAR_SATE)
@@ -74,170 +77,268 @@ void UI_TEST(uint8_t operate_)
 
     if(seq<=10)
     {
+        if (UI_cnt==0) {
+            if (Gimbal_Height_flag==High)
+            {
+                Line.interaction_figure[0].start_x = 1348;//图形坐标x
+                Line.interaction_figure[0].start_y = 388;//图坐标y
+            }
+            else if(Gimbal_Height_flag==Middle)
+            {
+                Line.interaction_figure[0].start_x = 1403;//图形坐标x
+                Line.interaction_figure[0].start_y = 388;//图坐标y
+            }
+            else if(Gimbal_Height_flag==Low) {
+                Line.interaction_figure[0].start_x = 1460;//图形坐标x
+                Line.interaction_figure[0].start_y = 388;//图坐标y
+            }
+
+            Line.interaction_figure[0].figure_name[0] = 0x70;//名字是为了区分图片内容
+            Line.interaction_figure[0].operate_tpye =  operate_ ;//增加图形
+            Line.interaction_figure[0].figure_tpye =  2; //圆
+            Line.interaction_figure[0].layer = 7;//图层 7
+            Line.interaction_figure[0].color = 3;//橙色
+            Line.interaction_figure[0].width = 10;//图形线宽
+            //	Line.interaction_figure[4].start_x = 960;//图形坐标x
+            //	Line.interaction_figure[4].start_y = 540;//图坐标y
+            //	Line.interaction_figure[4].details_a = 1000;//
+            //	Line.interaction_figure[4].details_b = 130;//
+            Line.interaction_figure[0].details_c = 30;//
 
 
+            /*弹丸数*/
+            if(all_bullet <= 50)
+            {
+                Line.interaction_figure[1].color = 3;//橙色
+            }
+            else
+            {
+                Line.interaction_figure[1].color = 8;//白色
+            }
 
-        /*自瞄框*/
-        if (Gimbal_Height_flag==High)
-        {
-            Line.interaction_figure[0].start_x = 1348;//图形坐标x
-            Line.interaction_figure[0].start_y = 388;//图坐标y
+
+            Line.interaction_figure[1].figure_name[0] = 0x71;//名字是为了区分图片内容 ， 为了后面删除图片所用
+            Line.interaction_figure[1].operate_tpye =  operate_ ;//增加图形
+            Line.interaction_figure[1].figure_tpye =  6; //整型数
+            Line.interaction_figure[1].layer = 4;//图层 4
+    //	Line.interaction_figure[1].color = 8;//白色
+            Line.interaction_figure[1].width = 3;//图形线宽
+            Line.interaction_figure[1].details_a = 30;//字体大小
+            Line.interaction_figure[1].start_x = 1365;//图形坐标x
+            Line.interaction_figure[1].start_y = 655;//图坐标y
+            Line.interaction_figure[1].details_c =all_bullet;
+
+
+            /*装甲板识别*/
+            if (MiniPC_ReceivePacket.fireflag==0) {
+                Line.interaction_figure[2].color = 2;//绿色
+                Line.interaction_figure[2].details_c = 0;//
+            }else if(MiniPC_ReceivePacket.fireflag==1) {
+                Line.interaction_figure[2].color = 2;//橙色
+                Line.interaction_figure[2].details_c = 5;//
+            }else if(MiniPC_ReceivePacket.fireflag==2) {
+                Line.interaction_figure[2].color = 2;
+                Line.interaction_figure[2].details_c = 5;//
+            }
+
+            Line.interaction_figure[2].figure_name[0] = 0x72;//名字是为了区分图片内容
+            Line.interaction_figure[2].operate_tpye =  operate_ ;//增加图形
+            Line.interaction_figure[2].figure_tpye =  2; //圆
+            Line.interaction_figure[2].layer = 7;//图层 7
+            // Line.interaction_figure[2].color = 2;//绿色/
+            Line.interaction_figure[2].width = 15;//图形线宽
+    	    Line.interaction_figure[2].start_x = 960+(xMotorParam[YAW].MeasureImu->angle- MiniPC_ReceivePacket.yaw/PI*180)*10-10;//图形坐标x
+            Line.interaction_figure[2].start_y = 540-(xMotorParam[PITCH].MeasureImu->angle+MiniPC_ReceivePacket.pitch)/PI*180*5-30;//图坐标y
+
+
+            /*电容数*/
+            if(Cap_Measure.cap_value>=180)
+            {
+                Line.interaction_figure[3].color = 2;
+            }
+            else if(Cap_Measure.cap_value>=140&&Cap_Measure.cap_value<180)
+            {
+                Line.interaction_figure[3].color = 1;
+            }
+            else
+            {
+                Line.interaction_figure[3].color = 3;
+            }
+
+            Line.interaction_figure[3].figure_name[0] = 0x73;//名字是为了区分图片内容 ， 为了后面删除图片所用
+            Line.interaction_figure[3].operate_tpye =  operate_ ;//增加图形
+            Line.interaction_figure[3].figure_tpye =  6; //整型数
+            Line.interaction_figure[3].layer = 4;//图层 4
+    //	Line.interaction_figure[3].color = 4;//白色
+            Line.interaction_figure[3].width = 3;//图形线宽
+            Line.interaction_figure[3].details_a = 30;//字体大小
+            Line.interaction_figure[3].start_x = 623;//图形坐标x
+            Line.interaction_figure[3].start_y = 548;//图坐标y
+            Line.interaction_figure[3].details_c =Cap_Measure.cap_value ;
+
+
+    ///*模式转换*/
+            if(ui_state.PIC_STA[Motion_Pic] ==0)//F
+            {
+                Line.interaction_figure[4].start_x = 1348;//图形坐标x
+                Line.interaction_figure[4].start_y = 762;//图坐标y
+            }
+            else if(ui_state.PIC_STA[Motion_Pic] ==1)//G
+            {
+                Line.interaction_figure[4].start_x = 1403;//图形坐标x
+                Line.interaction_figure[4].start_y = 762;//图坐标y
+            }
+
+            else if(ui_state.PIC_STA[Motion_Pic] == 2)//B
+            {
+                Line.interaction_figure[4].start_x = 1460;//图形坐标x
+                Line.interaction_figure[4].start_y = 762;//图坐标y
+            }
+
+            Line.interaction_figure[4].figure_name[0] = 0x74;//名字是为了区分图片内容
+            Line.interaction_figure[4].operate_tpye =  operate_ ;//增加图形
+            Line.interaction_figure[4].figure_tpye =  2; //圆
+            Line.interaction_figure[4].layer = 7;//图层 7
+            Line.interaction_figure[4].color = 3;//橙色
+            Line.interaction_figure[4].width = 10;//图形线宽
+    //	Line.interaction_figure[4].start_x = 960;//图形坐标x
+    //	Line.interaction_figure[4].start_y = 540;//图坐标y
+    //	Line.interaction_figure[4].details_a = 1000;//
+    //	Line.interaction_figure[4].details_b = 130;//
+            Line.interaction_figure[4].details_c = 30;//
+    //  Line.interaction_figure[4].details_d = 400;//
+    //	Line.interaction_figure[4].details_e = 300;//
+
+            /*底盘指针*/
+            Line.interaction_figure[5].figure_name[0] = 0x75;
+            Line.interaction_figure[5].operate_tpye =  operate_; //修改图形
+            Line.interaction_figure[5].figure_tpye =  0; //直线
+            Line.interaction_figure[5].layer = 7;//图层
+            Line.interaction_figure[5].color = 3;//
+            Line.interaction_figure[5].width = 4;
+            Line.interaction_figure[5].start_x = 960;//图形坐标x960
+            Line.interaction_figure[5].start_y = 540;//图形坐标y600
+            Line.interaction_figure[5].details_d = ui_state.pointer[X_ZHOU];
+            Line.interaction_figure[5].details_e = ui_state.pointer[Y_ZHOU];
+
+            /*电容条*/
+            if(Cap_Measure.cap_value>=180)
+            {
+                Line.interaction_figure[6].color = 2;
+            }
+            else if(Cap_Measure.cap_value>=140&&Cap_Measure.cap_value<180)
+            {
+                Line.interaction_figure[6].color = 1;
+            }
+            else
+            {
+                Line.interaction_figure[6].color = 3;
+            }
+
+            Line.interaction_figure[6].figure_name[0] = 0x76;//名字是为了区分图片内容
+            Line.interaction_figure[6].operate_tpye =  operate_ ;//增加图形
+            Line.interaction_figure[6].figure_tpye =  4;//圆弧
+            Line.interaction_figure[6].layer = 4;//图层 4
+    //	Line.interaction_figure[6].color = 2;//紫红
+            Line.interaction_figure[6].width = 15;//图形线宽
+            Line.interaction_figure[6].start_x = 794;//
+            Line.interaction_figure[6].start_y = 538;//
+            Line.interaction_figure[6].details_a = 214;//起始角度
+            Line.interaction_figure[6].details_b = 214+112* Cap_Measure.cap_value/240;//终止角度
+            Line.interaction_figure[6].details_d = 219;
+            Line.interaction_figure[6].details_e = 308;
+            UI_cnt++;
+        }else {
+
+            if (send_robot_hurt_id()==0&&last_Hp_becoming!=0) {
+                Line.interaction_figure[0].figure_name[0] = 0x70;//名字是为了区分图片内容
+                Line.interaction_figure[0].operate_tpye =  operate_ ;//增加图形
+                Line.interaction_figure[0].figure_tpye =  4;//圆弧
+                Line.interaction_figure[0].layer = 1;//图层 4
+                //	Line.interaction_figure[6].color = 2;//紫红
+                Line.interaction_figure[0].width = 15;//图形线宽
+                Line.interaction_figure[0].start_x =960;//
+                Line.interaction_figure[0].start_y = 580;//
+                Line.interaction_figure[0].details_a = 330+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);//起始角度
+                if (Line.interaction_figure[0].details_a>360) {
+                    Line.interaction_figure[0].details_a-=360;
+                }
+
+                Line.interaction_figure[0].details_b = 30+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);
+                //终止角度
+                if (Line.interaction_figure[0].details_b<0) {
+                    Line.interaction_figure[0].details_b+=360;
+                }
+
+                Line.interaction_figure[0].details_d = 280;
+                Line.interaction_figure[0].details_e = 280;
+
+            }else if (send_robot_hurt_id()==3&&last_Hp_becoming!=0) {
+                Line.interaction_figure[1].figure_name[0] = 0x70;//名字是为了区分图片内容
+                Line.interaction_figure[1].operate_tpye =  operate_ ;//增加图形
+                Line.interaction_figure[1].figure_tpye =  4;//圆弧
+                Line.interaction_figure[1].layer = 1;//图层 4
+                //	Line.interaction_figure[6].color = 2;//紫红
+                Line.interaction_figure[1].width = 15;//图形线宽
+                Line.interaction_figure[1].start_x =960;//
+                Line.interaction_figure[1].start_y = 580;//
+                Line.interaction_figure[1].details_a = 60+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);//起始角度
+                Line.interaction_figure[1].details_b = 120+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);//终止角度
+                Line.interaction_figure[1].details_d = 280;
+                Line.interaction_figure[1].details_e = 280;
+            }else if (send_robot_hurt_id()==2&&last_Hp_becoming!=0) {
+                Line.interaction_figure[2].figure_name[0] = 0x70;//名字是为了区分图片内容
+                Line.interaction_figure[2].operate_tpye =  operate_ ;//增加图形
+                Line.interaction_figure[2].figure_tpye =  4;//圆弧
+                Line.interaction_figure[2].layer = 1;//图层 4
+                //	Line.interaction_figure[6].color = 2;//紫红
+                Line.interaction_figure[2].width = 15;//图形线宽
+                Line.interaction_figure[2].start_x =960;//
+                Line.interaction_figure[2].start_y = 580;//
+                Line.interaction_figure[2].details_a = 150+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);//起始角度
+                Line.interaction_figure[2].details_b = 210+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);//终止角度
+                Line.interaction_figure[2].details_d = 280;
+                Line.interaction_figure[2].details_e = 280;
+            }else if (send_robot_hurt_id()==1&&last_Hp_becoming!=0) {
+                Line.interaction_figure[3].figure_name[0] = 0x70;//名字是为了区分图片内容
+                Line.interaction_figure[3].operate_tpye =  operate_ ;//增加图形
+                Line.interaction_figure[3].figure_tpye =  4;//圆弧
+                Line.interaction_figure[3].layer = 1;//图层 4
+                //	Line.interaction_figure[6].color = 2;//紫红
+                Line.interaction_figure[3].width = 15;//图形线宽
+                Line.interaction_figure[3].start_x =960;//
+                Line.interaction_figure[3].start_y = 580;//
+                Line.interaction_figure[3].details_a = 240+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);//起始角度
+                Line.interaction_figure[3].details_b = 300+(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle);//终止角度
+                Line.interaction_figure[3].details_d = 280;
+                Line.interaction_figure[3].details_e = 280;
+
+            }else {
+                Line.interaction_figure[0].figure_name[0] = 0x70;//名字是为了区分图片内容
+                Line.interaction_figure[0].operate_tpye =  operate_ ;//增加图形
+                Line.interaction_figure[0].figure_tpye =  4;//圆弧
+                Line.interaction_figure[0].layer = 1;//图层 4
+                //	Line.interaction_figure[6].color = 2;//紫红
+                Line.interaction_figure[0].width = 15;//图形线宽
+                Line.interaction_figure[0].start_x =960;//
+                Line.interaction_figure[0].start_y = 580;//
+                Line.interaction_figure[0].details_a = 0;//起始角度
+                Line.interaction_figure[0].details_b = 0;//终止角度
+                Line.interaction_figure[0].details_d = 0;
+                Line.interaction_figure[0].details_e = 0;
+            }
+
+
+            UI_cnt=0;
         }
-        else if(Gimbal_Height_flag==Middle)
-        {
-            Line.interaction_figure[0].start_x = 1403;//图形坐标x
-            Line.interaction_figure[0].start_y = 388;//图坐标y
-        }
-        else if(Gimbal_Height_flag==Low) {
-            Line.interaction_figure[0].start_x = 1460;//图形坐标x
-            Line.interaction_figure[0].start_y = 388;//图坐标y
-        }
 
-        Line.interaction_figure[0].figure_name[0] = 0x70;//名字是为了区分图片内容
-        Line.interaction_figure[0].operate_tpye =  operate_ ;//增加图形
-        Line.interaction_figure[0].figure_tpye =  2; //圆
-        Line.interaction_figure[0].layer = 7;//图层 7
-        Line.interaction_figure[0].color = 3;//橙色
-        Line.interaction_figure[0].width = 10;//图形线宽
-        //	Line.interaction_figure[4].start_x = 960;//图形坐标x
-        //	Line.interaction_figure[4].start_y = 540;//图坐标y
-        //	Line.interaction_figure[4].details_a = 1000;//
-        //	Line.interaction_figure[4].details_b = 130;//
-        Line.interaction_figure[0].details_c = 30;//
+            /*自瞄框*/
 
-
-        /*弹丸数*/
-        if(all_bullet <= 50)
-        {
-            Line.interaction_figure[1].color = 3;//橙色
-        }
-        else
-        {
-            Line.interaction_figure[1].color = 8;//白色
-        }
-
-
-        Line.interaction_figure[1].figure_name[0] = 0x71;//名字是为了区分图片内容 ， 为了后面删除图片所用
-        Line.interaction_figure[1].operate_tpye =  operate_ ;//增加图形
-        Line.interaction_figure[1].figure_tpye =  6; //整型数
-        Line.interaction_figure[1].layer = 4;//图层 4
-//	Line.interaction_figure[1].color = 8;//白色
-        Line.interaction_figure[1].width = 3;//图形线宽
-        Line.interaction_figure[1].details_a = 30;//字体大小
-        Line.interaction_figure[1].start_x = 1365;//图形坐标x
-        Line.interaction_figure[1].start_y = 655;//图坐标y
-        Line.interaction_figure[1].details_c =all_bullet;
-
-
-        /*装甲板识别*/
-        Line.interaction_figure[2].figure_name[0] = 0x72;//名字是为了区分图片内容
-        Line.interaction_figure[2].operate_tpye =  operate_ ;//增加图形
-        Line.interaction_figure[2].figure_tpye =  2; //圆
-        Line.interaction_figure[2].layer = 7;//图层 7
-        Line.interaction_figure[2].color = 2;//绿色
-        Line.interaction_figure[2].width = 15;//图形线宽
-//    	Line.interaction_figure[2].start_x = 673+MiniPC_ReceivePacket.x/1440*578;//图形坐标x
-//        Line.interaction_figure[2].start_y = 360+(-MiniPC_ReceivePacket.y+1080)/1080*394-35 ;//图坐标y
-//        Line.interaction_figure[2].details_c = MiniPC_ReceivePacket.r/40;//
-
-        /*电容数*/
-        if(Cap_Measure.cap_value>=180)
-        {
-            Line.interaction_figure[3].color = 2;
-        }
-        else if(Cap_Measure.cap_value>=140&&Cap_Measure.cap_value<180)
-        {
-            Line.interaction_figure[3].color = 1;
-        }
-        else
-        {
-            Line.interaction_figure[3].color = 3;
-        }
-
-        Line.interaction_figure[3].figure_name[0] = 0x73;//名字是为了区分图片内容 ， 为了后面删除图片所用
-        Line.interaction_figure[3].operate_tpye =  operate_ ;//增加图形
-        Line.interaction_figure[3].figure_tpye =  6; //整型数
-        Line.interaction_figure[3].layer = 4;//图层 4
-//	Line.interaction_figure[3].color = 4;//白色
-        Line.interaction_figure[3].width = 3;//图形线宽
-        Line.interaction_figure[3].details_a = 30;//字体大小
-        Line.interaction_figure[3].start_x = 623;//图形坐标x
-        Line.interaction_figure[3].start_y = 548;//图坐标y
-        Line.interaction_figure[3].details_c =Cap_Measure.cap_value ;
-
-
-///*模式转换*/
-        if(ui_state.PIC_STA[Motion_Pic] ==0)//F
-        {
-            Line.interaction_figure[4].start_x = 1348;//图形坐标x
-            Line.interaction_figure[4].start_y = 762;//图坐标y
-        }
-        else if(ui_state.PIC_STA[Motion_Pic] ==1)//G
-        {
-            Line.interaction_figure[4].start_x = 1403;//图形坐标x
-            Line.interaction_figure[4].start_y = 762;//图坐标y
-        }
-
-        else if(ui_state.PIC_STA[Motion_Pic] == 2)//B
-        {
-            Line.interaction_figure[4].start_x = 1460;//图形坐标x
-            Line.interaction_figure[4].start_y = 762;//图坐标y
-        }
-
-        Line.interaction_figure[4].figure_name[0] = 0x74;//名字是为了区分图片内容
-        Line.interaction_figure[4].operate_tpye =  operate_ ;//增加图形
-        Line.interaction_figure[4].figure_tpye =  2; //圆
-        Line.interaction_figure[4].layer = 7;//图层 7
-        Line.interaction_figure[4].color = 3;//橙色
-        Line.interaction_figure[4].width = 10;//图形线宽
-//	Line.interaction_figure[4].start_x = 960;//图形坐标x
-//	Line.interaction_figure[4].start_y = 540;//图坐标y
-//	Line.interaction_figure[4].details_a = 1000;//
-//	Line.interaction_figure[4].details_b = 130;//
-        Line.interaction_figure[4].details_c = 30;//
-//  Line.interaction_figure[4].details_d = 400;//
-//	Line.interaction_figure[4].details_e = 300;//
-
-        /*底盘指针*/
-        Line.interaction_figure[5].figure_name[0] = 0x75;
-        Line.interaction_figure[5].operate_tpye =  operate_; //修改图形
-        Line.interaction_figure[5].figure_tpye =  0; //直线
-        Line.interaction_figure[5].layer = 7;//图层
-        Line.interaction_figure[5].color = 3;//
-        Line.interaction_figure[5].width = 4;
-        Line.interaction_figure[5].start_x = 960;//图形坐标x960
-        Line.interaction_figure[5].start_y = 540;//图形坐标y600
-        Line.interaction_figure[5].details_d = ui_state.pointer[X_ZHOU];
-        Line.interaction_figure[5].details_e = ui_state.pointer[Y_ZHOU];
-
-        /*电容条*/
-        if(Cap_Measure.cap_value>=180)
-        {
-            Line.interaction_figure[6].color = 2;
-        }
-        else if(Cap_Measure.cap_value>=140&&Cap_Measure.cap_value<180)
-        {
-            Line.interaction_figure[6].color = 1;
-        }
-        else
-        {
-            Line.interaction_figure[6].color = 3;
-        }
-
-        Line.interaction_figure[6].figure_name[0] = 0x76;//名字是为了区分图片内容
-        Line.interaction_figure[6].operate_tpye =  operate_ ;//增加图形
-        Line.interaction_figure[6].figure_tpye =  4;//圆弧
-        Line.interaction_figure[6].layer = 4;//图层 4
-//	Line.interaction_figure[6].color = 2;//紫红
-        Line.interaction_figure[6].width = 15;//图形线宽
-        Line.interaction_figure[6].start_x = 794;//
-        Line.interaction_figure[6].start_y = 538;//
-        Line.interaction_figure[6].details_a = 214;//起始角度
-        Line.interaction_figure[6].details_b = 214+112* Cap_Measure.cap_value/240;//终止角度
-        Line.interaction_figure[6].details_d = 219;
-        Line.interaction_figure[6].details_e = 308;
 
     }
+
+
+
 
     memcpy(Tx_Data+13,(uint8_t*)&Line,105);
 

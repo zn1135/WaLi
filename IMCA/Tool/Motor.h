@@ -125,6 +125,7 @@ typedef struct
     float  round_cnt;
     float CAHSSIS_position;
     unsigned char    reverse_derection;	//0:forward 1:reverse
+    float  last_v;
 }DM_J4310_measure_t;
 
 typedef struct{
@@ -144,6 +145,7 @@ typedef struct{
     int16_t   power;//输出功率-1000~1000
     int32_t	  angle;
     float   vision_encoder;
+
 
 }mf9025_measure_t;
 

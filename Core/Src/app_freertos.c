@@ -233,13 +233,14 @@ void InteractTask(void *argument)
     //
 
     MotorCanSendCurrent();
-    static uint8_t _cnt=0;
-    if(_cnt++ > 10) {
+    // static uint8_t _cnt=0;
+    // if(_cnt++ > 10) {
       PowerSend();
-      _cnt=0;
-    }
+    //   _cnt=0;
+    // }
     // set_DM_J4310_motor_State(&hfdcan3, xMotorParam[PITCH].ID, save_zero_point);
-    // set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID,save_zero_point );
+    // set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID, enable);
+    // set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[YAW].ID, 0.0f, 0.0f, 0.0f, 0.0f, 5);
     //
 
     osDelay(1);

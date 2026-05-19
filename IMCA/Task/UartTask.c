@@ -11,8 +11,8 @@
 #include "Judge_interact.h"
 
 
-
-
+int8_t last_Hp;
+int8_t last_Hp_becoming = 0;
 /**********************************************************************************************************************
  * @brief  启动串口空闲中断,在初始化时调用
  * @param  UART_HandleTypeDef *huart   UART handle Structure
@@ -114,9 +114,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
     }
     if(huart->Instance == USART3)
     {
-
+        last_Hp=RoboHP();
         Judge_Read(judge_RxBuffer);
+        last_Hp_becoming=last_Hp-RoboHP();
         HAL_UARTEx_ReceiveToIdle_DMA(&huart3,judge_RxBuffer,sizeof(judge_RxBuffer));		// 重新使能串口3接收中断
+
         __HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
     }
     if (huart->Instance==LPUART1)

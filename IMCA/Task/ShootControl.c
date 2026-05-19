@@ -25,8 +25,8 @@ uint8_t  Stuck_Bullet_falg = 0;
 
 /* 射速控制参数 */
 // #define RICT_Speed 6720    // 摩擦轮转速(rpm)
-#define MaxShootSpeed 5000 // 最大射速(rpm)
-#define MaxRateRate 0.5    // 保持最大射速的比率 (0.0 - 1.0)
+#define MaxShootSpeed  5000 // 最大射速(rpm)
+#define MaxRateRate 0.4    // 保持最大射速的比率 (0.0 - 1.0)
 #define ReservedHert 30    // 预留热量
 
 /* 机械参数 */
@@ -37,17 +37,17 @@ uint8_t  Stuck_Bullet_falg = 0;
 /* 公式简化 */
 // 公式：  转速 / 减速比 / * 每转发数 / 60 * 单发热量 = 热量增加速率 = 冷却速率    化简得下式
 #define MinShootSpeed ((CoolingRate) / (SingleHeat) * 60 / (FirePreCircle) * (ReductionRatio)) // 最小射速(rpm)
-
+uint8_t single_shot=0;
 
 
 
 void SelectJudgeSpeed()     //Data selection for referees system
 {
     // 根据赛季规则设定射击速度，2024赛季步兵最大速度为25m/s
-    if(KEY_V)
-        Set_Shoot_Speed = -350;
-    else
-        Set_Shoot_Speed = -310;//358
+    // if(CH4<-500)
+    //     Set_Shoot_Speed = -155;
+    // else
+        Set_Shoot_Speed = -295;//358
     Target_Speed = (Set_Shoot_Speed * 19.2) + shoot_fix.TEMP_30 + shoot_fix.Level_3_fix_num;
 
 
@@ -69,7 +69,7 @@ void SelectJudgeSpeed()     //Data selection for referees system
         }
         else
         {
-        	if (Gimbal_Height_flag!=Low) {
+        	if (Gimbal_Height_flag==High) {
         		xMotorParam[FRICTR].EcoTar = -Set_Shoot_Speed * 19.2f;
         		xMotorParam[FRICTL].EcoTar = Set_Shoot_Speed * 19.2f;
         	}else
@@ -91,7 +91,8 @@ void ShootPluck_Fire() {
 if (held_cnt >10 && held_cnt <=300) {
 	if (CurrentHeat + SingleHeat > TotalHert - ReservedHert) {
 		// 	// 如果当前热量加上单发热量超过总热量减去预留热量，说明无法发射
-
+		xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+		xMotorParam[PLUCK].EcoTar = 0;//Robot_level()
 	}else {
 		xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
 		//                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
@@ -127,11 +128,23 @@ void PluckControl()
 		xMotorParam[PLUCK].EcoTar = 0;
 	}else if(xRobotMode.CtrlMode == PC && RC_UPPER_RIGHT_SW_DOWN)
 	{
-        xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
-        xMotorParam[PLUCK].EcoTar = 3000;
+		if(CH4>500&&single_shot==0) {
+			xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
+			//			//                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
+			xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle + (8192*36/8);
+			single_shot=1;
+		}else if (CH4<-500) {
+			xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+			xMotorParam[PLUCK].EcoTar = MaxShootSpeed;
+		}else if (CH4>-200&&CH4<200) {
+			xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
+			xMotorParam[PLUCK].EcoTar = 0;
+			single_shot=0;
+		}
+
 	}
 	else if(xRobotMode.CtrlMode == PC&& !RC_UPPER_RIGHT_SW_UP) {
-		//        press_cnt++;//计数器
+
 		if (Gimbal_Height_flag!=Low) {
 			if(mouse_right.deshake_key&&MiniPC_ReceivePacket.fireflag == 2)
 			{
@@ -139,11 +152,11 @@ void PluckControl()
 				// xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
 				// xMotorParam[PLUCK].EcoTar =MaxShootSpeed;//Robot_level()
 			}
-			else if (KEY_V&&MiniPC_ReceivePacket.fireflag == 2) {
-				xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
-				//                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
-				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle + (8192*36/8);
-			}
+			// else if (KEY_V&&MiniPC_ReceivePacket.fireflag == 2) {
+			// 	xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
+			// 	//                    xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle + (8192/8*36);
+			// 	xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle + (8192*36/8);
+			// }
 			else if(!mouse_left.deshake_key&&mouse_right.deshake_key&&MiniPC_ReceivePacket.fireflag != 2)
 			{
 				xMotorParam[PLUCK].CloseLoopMode = SpdClsloop;
@@ -151,7 +164,7 @@ void PluckControl()
 			}
 			else
 			{
-				if(mouse_left.deshake_key)
+				if(mouse_left.deshake_key||RC_UPPER_RIGHT_SW_DOWN)
 				{
 
 					held_cnt++;//按下自动计数
@@ -196,9 +209,9 @@ void PluckControl()
 				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle;
 			}
 		}
-		if(abs(xMotorParam[PLUCK].CurrentOutput) > 8000)
+		if(ABS(xMotorParam[PLUCK].MeasureEco->real_current) > 8000)
 		{
-			// Stuck_Bullet_cnt ++;
+			Stuck_Bullet_cnt ++;
 			if(Stuck_Bullet_cnt >200)
 			{
 				Stuck_Bullet_falg = 1;
@@ -225,10 +238,6 @@ void PluckControl()
 
 void ShootControlSetValue(void) {
     SelectJudgeSpeed();
-    if(mouse_right.deshake_key)
-    {
-        MiniPC_SendPacket.mode = 1;
-    }
-    else MiniPC_SendPacket.mode = 0;
+
 }
 

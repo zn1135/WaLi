@@ -8,6 +8,7 @@
 
 #include "arm_math.h"
 #include "CapInteract.h"
+#include "ChassisControl.h"
 #include "main.h"
 #include "fdcan.h"
 #include "Motor.h"
@@ -230,7 +231,9 @@ void GetMotorMeasureNew(motor_param_t *motor_param, const uint8_t can_rx_data[])
             motor_param->MeasureDM->Last_position = motor_param->MeasureDM->position;
             motor_param->MeasureDM->position = uint_to_float(motor_param->MeasureDM->p_int,P_MIN,P_MAX, 16);
             //(-12.5,12.5)
+            motor_param->MeasureDM->last_v=motor_param->MeasureDM->velocity;
             motor_param->MeasureDM->velocity = uint_to_float(motor_param->MeasureDM->v_int,V_MIN,V_MAX, 12); //(-30,30)
+
             motor_param->MeasureDM->torque = uint_to_float(motor_param->MeasureDM->t_int,T_MIN,T_MAX, 12); //(-10,10)
             break;
         case LINK:
@@ -258,9 +261,12 @@ void GetChassisMes(uint8_t buff[])
 void MotorCanSendCurrent(void) {
     if (xRobotMode.CtrlMode == LOSE) {
         set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID, disable);
+        vTaskDelay (1);
+        set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID, clear_error);
         xMotorParam[YAW].MeasureDM->DM_J4310_InitFlag = 0;
         SetCanFronMotorValue(&hfdcan1, 0,  0,  0, 0);
         set_DM_J4310_motor_State(&hfdcan3, xMotorParam[PITCH].ID, disable);
+        // set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID, clear_error);
         xMotorParam[PITCH].MeasureDM->DM_J4310_InitFlag = 0;
         vTaskDelay (1);
         // if (xMotorParam[FRICTR].MeasureEco->speed_rpm<)
@@ -270,14 +276,18 @@ void MotorCanSendCurrent(void) {
             set_DM_J4310_motor_State(&hfdcan3, xMotorParam[PITCH].ID, enable);
             xMotorParam[PITCH].MeasureDM->DM_J4310_InitFlag = 1;
         } else if (xMotorParam[PITCH].MeasureDM->ERROR==1) {
-            set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[PITCH].ID, 0,0,0,0.2,-1.2*ABS(arm_cos_f32(xMotorParam[PITCH].MeasureDM->position))+xMotorParam[PITCH].CurrentOutput);
+            // set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[PITCH].ID, 0,0,0,0.0,xMotorParam[PITCH].CurrentOutput);
+            set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[PITCH].ID, 0,0,0,0.0,-1.1*ABS(arm_cos_f32(xMotorParam[PITCH].MeasureDM->position))+xMotorParam[PITCH].CurrentOutput);
+
         }
         if (xMotorParam[PITCH].MeasureDM->ERROR==1&&xMotorParam[YAW].MeasureDM->ERROR==1) {
             if (Motor_TimeOut_flag==0) {
                 SetCanFronMotorValue(&hfdcan1, xMotorParam[WHEEL_FR].CurrentOutput,  xMotorParam[WHEEL_FL].CurrentOutput,  xMotorParam[WHEEL_BR].CurrentOutput,  xMotorParam[WHEEL_BL].CurrentOutput);
+                // SetCanFronMotorValue(&hfdcan1, xMotorParam[WHEEL_FR].CurrentOutput,   0,   0,   0);
             }
                 // SetCanFronMotorValue(&hfdcan1, 0, 0, 0 , xMotorParam[WHEEL_BL].CurrentOutput  );
             SetCanBackMotorValue(&hfdcan2, xMotorParam[Height].CurrentOutput,xMotorParam[FRICTR].CurrentOutput,xMotorParam[FRICTL].CurrentOutput,xMotorParam[PLUCK].CurrentOutput);
+
         }
         // SetCanFronMotorValue(&hfdcan1,0 ,  0,  0,  xMotorParam[WHEEL_BL].CurrentOutput);
         if (xMotorParam[YAW].MeasureDM->ERROR==0) {

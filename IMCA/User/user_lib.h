@@ -12,7 +12,8 @@
 
 #define IMU_UPDATA 1	//use imu
 #define INFANTRY 1
-#define  CHASSIS_MAXSPEED 9000 //底盘最大速度
+#define  CHASSIS_MAXSPEED ((send_chassis_power_limit()== 35) ? (3500) : (6000)) //底盘最大速度
+// #define  CHASSIS_MAXSPEED 6000 //底盘最大速度
 #define GPIO_DEBOUNCE_TICKS 10U // 1ms调用周期下，GPIO输入消抖阈值（建议5~10）
 // 高度状态机滞回阈值（1ms调用周期）
 #define HEIGHT_STATE_ENTER_TICKS 10U // Middle进入High/Low所需连续触发次数
@@ -133,10 +134,11 @@ typedef struct{
     uint8_t		basic_region;
 }relative_angle_t;
 
+//68.601784
 
 
-#define Gimbal_FrontAngle  89.031784f
-#define Gimbal_backAngle  -91.410370f//
+#define Gimbal_FrontAngle  89.931784f
+#define Gimbal_backAngle  89.931784-180.0f//
 #define Moment_of_Inertia 0.074867862  //0.01006421849
 #define PI 3.14159265358979f  /*圆周率*/
 #define Eco_to_Degree 0.000095826f
