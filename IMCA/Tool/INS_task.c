@@ -197,6 +197,13 @@ void Get_Rotation_BtoE(float roll,float pitch,float yaw,float P_Acc,float R_Acc,
 	Acc_Body[2] = Y_Acc;//z
 }
 
+/**********************************************************************************************************************
+  * @Func	 void My_BodyFrameToEarthFrame_Matrix(void)
+  * @Brief   使用旋转矩阵将机体坐标系加速度转换到地球坐标系
+  * @Param	 无
+  * @Retval	 无
+  * @Note    使用Get_Rotation_BtoE计算的旋转矩阵Rotation_BtoE进行坐标变换
+*********************************************************************************************************************/
 void My_BodyFrameToEarthFrame_Matrix(void)
 {
 	Acc_Normol[0] = Rotation_BtoE[0]*Acc_Body[0]+Rotation_BtoE[1]*Acc_Body[1]+Rotation_BtoE[2]*Acc_Body[2];

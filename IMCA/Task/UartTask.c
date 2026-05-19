@@ -59,6 +59,13 @@ HAL_StatusTypeDef HAL_UARTEx_ReceiveToIdle_DMA_NoIT(UART_HandleTypeDef *huart)
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+  * @Brief   UART错误回调
+  * @Param	 UART_HandleTypeDef *huart：UART句柄
+  * @Retval	 无
+  * @Note    发生错误后重新使能各串口的空闲中断DMA接收
+*********************************************************************************************************************/
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
     if(huart->Instance == UART5)
@@ -86,6 +93,13 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         HAL_UARTEx_ReceiveToIdle_DMA(&hlpuart1, VT_RxBuffer, sizeof(VT_RxBuffer));
     }
 }
+/**********************************************************************************************************************
+  * @Func	 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+  * @Brief   UART DMA接收完成回调
+  * @Param	 UART_HandleTypeDef *huart：UART句柄
+  * @Retval	 无
+  * @Note    UART1 DMA接收完成后重新启动DMA接收
+*********************************************************************************************************************/
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 
@@ -95,6 +109,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     }
 
 }
+/**********************************************************************************************************************
+  * @Func	 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+  * @Brief   UART空闲中断回调
+  * @Param	 UART_HandleTypeDef *huart：UART句柄
+  *          uint16_t Size：接收数据长度
+  * @Retval	 无
+  * @Note    分发USART2(遥控器)/UART5(IMU)/USART3(裁判系统)/LPUART1(VT)的接收数据
+*********************************************************************************************************************/
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
     if(huart->Instance == USART2)
     {

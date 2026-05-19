@@ -1,6 +1,6 @@
 #include "Driver_Judge.h"
 
-/***********************************    ��    DJI�ṩ��CRCУ�캯��   ��  ***********************************/
+/***********************************    ��    DJI�ṩ��CRCУ�캯��   ��  ***********************************/
 //crc8 generator polynomial:G(x)=x8+x5+x4+1
 const unsigned char CRC8_INIT = 0xff;
 const unsigned char CRC8_TAB[256] =
@@ -24,6 +24,14 @@ const unsigned char CRC8_TAB[256] =
 };
 
 
+/**********************************************************************************************************************
+  * @Func	 unsigned char Get_CRC8_Check_Sum(unsigned char *pchMessage, unsigned int dwLength, unsigned char ucCRC8)
+  * @Brief   CRC8校验值计算
+  * @Param	 unsigned char *pchMessage：数据缓冲区
+  *          unsigned int dwLength：数据长度
+  *          unsigned char ucCRC8：CRC8初始值
+  * @Retval	 unsigned char：CRC8校验值
+*********************************************************************************************************************/
 unsigned char Get_CRC8_Check_Sum(unsigned char *pchMessage,unsigned int dwLength,unsigned char ucCRC8)
 {
     unsigned char ucIndex;
@@ -41,6 +49,13 @@ unsigned char Get_CRC8_Check_Sum(unsigned char *pchMessage,unsigned int dwLength
 ** Input: Data to Verify,Stream length = Data + checksum
 ** Output: True or False (CRC Verify Result)
 */
+/**********************************************************************************************************************
+  * @Func	 unsigned int Verify_CRC8_Check_Sum(unsigned char *pchMessage, unsigned int dwLength)
+  * @Brief   CRC8校验验证
+  * @Param	 unsigned char *pchMessage：数据缓冲区(含校验字节)
+  *          unsigned int dwLength：数据总长度
+  * @Retval	 unsigned int：校验通过返回非零
+*********************************************************************************************************************/
 unsigned int Verify_CRC8_Check_Sum(unsigned char *pchMessage, unsigned int dwLength)
 {
     unsigned char ucExpected = 0;
@@ -56,6 +71,13 @@ unsigned int Verify_CRC8_Check_Sum(unsigned char *pchMessage, unsigned int dwLen
 ** Input: Data to CRC and append,Stream length = Data + checksum
 ** Output: True or False (CRC Verify Result)
 */
+/**********************************************************************************************************************
+  * @Func	 void Append_CRC8_Check_Sum(unsigned char *pchMessage, unsigned int dwLength)
+  * @Brief   在数据末尾追加CRC8校验值
+  * @Param	 unsigned char *pchMessage：数据缓冲区
+  *          unsigned int dwLength：数据+校验总长度
+  * @Retval	 无
+*********************************************************************************************************************/
 void Append_CRC8_Check_Sum(unsigned char *pchMessage, unsigned int dwLength)
 {
     unsigned char ucCRC = 0;
@@ -109,6 +131,14 @@ const uint16_t wCRC_Table[256] =
 ** Input: Data to check,Stream length, initialized checksum
 ** Output: CRC checksum
 */
+/**********************************************************************************************************************
+  * @Func	 uint16_t Get_CRC16_Check_Sum(uint8_t *pchMessage, uint32_t dwLength, uint16_t wCRC)
+  * @Brief   CRC16校验值计算
+  * @Param	 uint8_t *pchMessage：数据缓冲区
+  *          uint32_t dwLength：数据长度
+  *          uint16_t wCRC：CRC16初始值
+  * @Retval	 uint16_t：CRC16校验值
+*********************************************************************************************************************/
 uint16_t Get_CRC16_Check_Sum(uint8_t *pchMessage,uint32_t dwLength,uint16_t wCRC)
 {
     uint8_t chData;
@@ -131,6 +161,13 @@ uint16_t Get_CRC16_Check_Sum(uint8_t *pchMessage,uint32_t dwLength,uint16_t wCRC
 ** Input: Data to Verify,Stream length = Data + checksum
 ** Output: True or False (CRC Verify Result)
 */
+/**********************************************************************************************************************
+  * @Func	 uint32_t Verify_CRC16_Check_Sum(uint8_t *pchMessage, uint32_t dwLength)
+  * @Brief   CRC16校验验证
+  * @Param	 uint8_t *pchMessage：数据缓冲区(含校验字节)
+  *          uint32_t dwLength：数据总长度
+  * @Retval	 uint32_t：校验通过返回非零
+*********************************************************************************************************************/
 uint32_t Verify_CRC16_Check_Sum(uint8_t *pchMessage, uint32_t dwLength)
 {
     uint16_t wExpected = 0;
@@ -148,6 +185,13 @@ uint32_t Verify_CRC16_Check_Sum(uint8_t *pchMessage, uint32_t dwLength)
 ** Input: Data to CRC and append,Stream length = Data + checksum
 ** Output: True or False (CRC Verify Result)
 */
+/**********************************************************************************************************************
+  * @Func	 void Append_CRC16_Check_Sum(uint8_t *pchMessage, uint32_t dwLength)
+  * @Brief   在数据末尾追加CRC16校验值
+  * @Param	 uint8_t *pchMessage：数据缓冲区
+  *          uint32_t dwLength：数据+校验总长度
+  * @Retval	 无
+*********************************************************************************************************************/
 void Append_CRC16_Check_Sum(uint8_t * pchMessage,uint32_t dwLength)
 {
     uint16_t wCRC = 0;
@@ -159,7 +203,7 @@ void Append_CRC16_Check_Sum(uint8_t * pchMessage,uint32_t dwLength)
     pchMessage[dwLength-2] = (uint8_t)(wCRC & 0x00ff);
     pchMessage[dwLength-1] = (uint8_t)((wCRC >> 8)& 0x00ff);
 }
-/***********************************    ��    DJI�ṩ��CRCУ�캯��   ��  ***********************************/   
+/***********************************    ��    DJI�ṩ��CRCУ�캯��   ��  ***********************************/   
   
 
 

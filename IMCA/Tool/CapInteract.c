@@ -32,6 +32,14 @@ void PowerSend(void)
 
 	SendCapPowerData(&hfdcan3, Cap_Measure.buffer_mode,power_limit,chassis_power_buffer,0x00,0x00);
 }
+/**********************************************************************************************************************
+  * @Func	 void PowerSend_Cmd(uint8_t cmd, uint8_t cmd_val)
+  * @Brief   发送控制命令给超电功率板
+  * @Param	 uint8_t cmd：命令码，详见SUPERCAP_cmd_code
+  *          uint8_t cmd_val：命令参数值
+  * @Retval	 无
+  * @Note    通过FDCAN3发送到功率板(0x107)
+*********************************************************************************************************************/
 void PowerSend_Cmd(uint8_t cmd,uint8_t cmd_val)
 {
 	uint8_t chassis_power_buffer = Chassis_power_buffer();

@@ -281,6 +281,13 @@ float *kalman_filter_calc(kalman_filter_t *F, float signal1, float signal2)
 
 
 
+/**********************************************************************************************************************
+  * @Func	 void MouseRampInit(void)
+  * @Brief   鼠标输入一阶低通滤波器初始化
+  * @Param	 无
+  * @Retval	 无
+  * @Note    对鼠标XY轴输入做一阶低通滤波，时间常数为GIMBAL_CONTROL_TIME
+*********************************************************************************************************************/
 void MouseRampInit(void)
 {
 	const static float mouse_x_order_filter[1] = {MOUSE_X_NUM};

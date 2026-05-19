@@ -47,6 +47,13 @@ float AngleLimit(float tar, float max_angle, float min_angle)
 
 
 
+/**********************************************************************************************************************
+  * @Func	 void TargetAngleProc(motor_param_t *ptr)
+  * @Brief   目标角度跨圈处理
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  * @Retval	 无
+  * @Note    防止目标角跳变：DJI电机以8191为周期，DM电机以2*PI为周期，IMU以360度为周期
+*********************************************************************************************************************/
 void TargetAngleProc(motor_param_t *ptr)
 {
     if(ptr->FeedbackMode == EcoFeedback)
@@ -81,6 +88,14 @@ void TargetAngleProc(motor_param_t *ptr)
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void FloatToUint8_t(float fNum, uint8_t *strBuf, int nLen)
+  * @Brief   浮点数转为4字节数组
+  * @Param	 float fNum：要转换的浮点数
+  *          uint8_t *strBuf：输出缓冲区(至少4字节)
+  *          int nLen：缓冲区长度
+  * @Retval	 无
+*********************************************************************************************************************/
 void FloatToUint8_t(float fNum, uint8_t *strBuf, int nLen)
 {
     if (nLen < 4)
@@ -94,6 +109,13 @@ void FloatToUint8_t(float fNum, uint8_t *strBuf, int nLen)
     }
 }
 
+/**********************************************************************************************************************
+  * @Func	 float GetPositionRelativeAngle_front(motor_param_t * ptr)
+  * @Brief   获取YAW前侧相对角度
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  * @Retval	 float：前侧相对角度(弧度)
+  * @Note    计算电机位置与CHASSIS_Yaw_IMU_FRONT的相对角，含方向判断
+*********************************************************************************************************************/
 float GetPositionRelativeAngle_front(motor_param_t * ptr)
 {
 	float relative_angle_dm = 0,relative_angle_out_dm = 0;;
@@ -142,6 +164,13 @@ float GetPositionRelativeAngle_front(motor_param_t * ptr)
 	return relative_angle_out_dm * direction_flag;
 }
 
+/**********************************************************************************************************************
+  * @Func	 float GetPositionRelativeAngle_back(motor_param_t * ptr)
+  * @Brief   获取YAW后侧相对角度
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  * @Retval	 float：后侧相对角度(弧度)
+  * @Note    计算电机位置与CHASSIS_Yaw_IMU_BACK的相对角，含方向判断
+*********************************************************************************************************************/
 float GetPositionRelativeAngle_back(motor_param_t * ptr)
 {
 	float relative_angle_dm = 0,relative_angle_out_dm = 0;;
@@ -266,6 +295,13 @@ void relative_angle_processing(motor_param_t * ptr)
 
 }
 
+/**********************************************************************************************************************
+  * @Func	 void GetGimbalFrontBackOrientation(motor_param_t * ptr)
+  * @Brief   获取云台前后朝向
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  * @Retval	 无
+  * @Note    根据DM电机位置判断云台当前朝向前侧还是后侧，更新方向标志和跟随角
+*********************************************************************************************************************/
 void GetGimbalFrontBackOrientation(motor_param_t * ptr) {
 	if (ptr->MeasureDM->position > 0.0f && ptr->MeasureDM->position < 180.0f) {
 		if (highlow_flag==0) {
@@ -281,6 +317,13 @@ void GetGimbalFrontBackOrientation(motor_param_t * ptr) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void MotorWatchdogMonitor(void)
+  * @Brief   电机和遥控器看门狗监控
+  * @Param	 无
+  * @Retval	 无
+  * @Note    检测底盘电机超时和遥控器超时，更新Motor_TimeOut_flag和RC_TimeOut_Flag
+*********************************************************************************************************************/
 void MotorWatchdogMonitor() {
 	if (xMotorParam[WHEEL_FR].Timeout_Flag>20&&xMotorParam[WHEEL_FL].Timeout_Flag>20&&xMotorParam[WHEEL_BR].Timeout_Flag>20&&xMotorParam[WHEEL_BL].Timeout_Flag>20) {
 		Motor_TimeOut_flag=0;
@@ -308,6 +351,13 @@ void MotorWatchdogMonitor() {
 
 
 
+/**********************************************************************************************************************
+  * @Func	 void Getreceive_yaw_relative_angle(motor_param_t * ptr)
+  * @Brief   获取YAW接收端相对角度
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  * @Retval	 无
+  * @Note    高位时使用DM位置计算，低位时使用IMU角度计算，结果映射到[-PI, PI]
+*********************************************************************************************************************/
 void Getreceive_yaw_relative_angle(motor_param_t * ptr) {
 	if (Gimbal_Height_flag==High) {
 		xRelativeAngle.receive_yaw_relative_rad =(xMotorParam[YAW].MeasureDM->position-Gimbal_FrontAngle)/180*PI;

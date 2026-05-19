@@ -66,6 +66,14 @@ typedef struct {
 // 按“端口+引脚”保存独立的消抖状态，避免不同输入互相影响
 static gpio_debounce_state_t s_gpio_debounce[GPIO_DEBOUNCE_MAX_ITEMS];
 
+/**********************************************************************************************************************
+  * @Func	 static gpio_debounce_state_t *GPIO_FindOrCreateDebounceState(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
+  * @Brief   查找或创建GPIO消抖状态槽
+  * @Param	 GPIO_TypeDef *GPIOx：GPIO端口
+  *          uint16_t GPIO_Pin：GPIO引脚号
+  * @Retval	 gpio_debounce_state_t*：对应的消抖状态结构体指针，失败返回NULL
+  * @Note    每个GPIO引脚独立维护消抖状态，状态池满时返回NULL
+*********************************************************************************************************************/
 static gpio_debounce_state_t *GPIO_FindOrCreateDebounceState(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin) {
     uint8_t i;
     // 先查找已存在的状态槽
@@ -94,6 +102,13 @@ static gpio_debounce_state_t *GPIO_FindOrCreateDebounceState(GPIO_TypeDef *GPIOx
 
 
 
+/**********************************************************************************************************************
+  * @Func	 void TotalInitTask(void)
+  * @Brief   系统总初始化任务
+  * @Param	 无
+  * @Retval	 无
+  * @Note    依次初始化CAN滤波器、UART/IMU、电机参数、PID参数、ADC等所有外设模块
+*********************************************************************************************************************/
 void TotalInitTask(void) {
     CANFilterInit();
     xRobotMode.CtrlMode = LOSE;
@@ -122,6 +137,13 @@ void TotalInitTask(void) {
 }
 uint32_t vbat_mv = 0;
 
+/**********************************************************************************************************************
+  * @Func	 void TotalControl(void)
+  * @Brief   系统总控制循环
+  * @Param	 无
+  * @Retval	 无
+  * @Note    依次执行IMU数据更新、控制模式选择、输入滤波、按键消抖、控制量给定
+*********************************************************************************************************************/
 void TotalControl(void) {
     // GPIO_Read(GPIOC, GPIO_PIN_9);
     // GPIO_Read(GPIOC, GPIO_PIN_7);
@@ -255,6 +277,13 @@ void TotalControl(void) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void CtrlModeSelect(void)
+  * @Brief   控制模式选择
+  * @Param	 无
+  * @Retval	 无
+  * @Note    根据遥控器/PC按键状态切换控制模式(PC/RC/LOSE)和底盘模式(跟随/分离/小陀螺)
+*********************************************************************************************************************/
 void CtrlModeSelect(void) {
 
     if (RoboHP()==0) {
@@ -299,6 +328,13 @@ void CtrlModeSelect(void) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void PidCalc(void)
+  * @Brief   全电机PID计算
+  * @Param	 无
+  * @Retval	 无
+  * @Note    对全部10个电机(4底盘+2云台+2摩擦轮+1拨弹轮+1高度)依次调用MotorCalc
+*********************************************************************************************************************/
 void PidCalc(void) {
     MotorCalc(&xMotorParam[WHEEL_FR]);
     MotorCalc(&xMotorParam[WHEEL_FL]);
@@ -313,6 +349,13 @@ void PidCalc(void) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void TotalControlSetValue(void)
+  * @Brief   统一设置各子系统控制量
+  * @Param	 无
+  * @Retval	 无
+  * @Note    按顺序调用云台初始化→升降控制→云台控制→射击控制→拨弹控制→底盘控制→PID→功率限制
+*********************************************************************************************************************/
 void TotalControlSetValue(void) {
     if (!Gimbal_Init_Flag) {
         GimbalInit();
@@ -334,6 +377,13 @@ void TotalControlSetValue(void) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void ALL_reset(uint8_t reset)
+  * @Brief   系统复位
+  * @Param	 uint8_t reset：非零时执行延时后NVIC系统复位
+  * @Retval	 无
+  * @Note    延时100ms后通过__set_FAULTMASK(1)和NVIC_SystemReset执行复位
+*********************************************************************************************************************/
 void ALL_reset(uint8_t reset) {
     if (reset) //复位
     {
@@ -344,6 +394,14 @@ void ALL_reset(uint8_t reset) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 uint8_t GPIO_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
+  * @Brief   带消抖的GPIO读取
+  * @Param	 GPIO_TypeDef *GPIOx：GPIO端口
+  *          uint16_t GPIO_Pin：GPIO引脚号
+  * @Retval	 uint8_t：消抖后的稳定电平(0或1)
+  * @Note    连续采样达到阈值后才更新稳定态，有效抑制按键抖动
+*********************************************************************************************************************/
 uint8_t GPIO_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin) {
     // 读取原始电平（未消抖）
     uint8_t raw = (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin) == GPIO_PIN_SET) ? 1U : 0U;
@@ -374,6 +432,13 @@ uint8_t GPIO_Read(GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin) {
     return state->stable_state;
 }
 
+/**********************************************************************************************************************
+  * @Func	 void LiftLowerControl(void)
+  * @Brief   云台升降限位状态机控制
+  * @Param	 无
+  * @Retval	 无
+  * @Note    三态滞回状态机(High/Middle/Low)，带入态/出态阈值避免边界抖动
+*********************************************************************************************************************/
 void LiftLowerControl() {
     static uint8_t high_enter_cnt = 0U;
     static uint8_t low_enter_cnt = 0U;

@@ -80,7 +80,7 @@ pid_t xMotorPid[2][2][MOTOR_NUM];
 
 
  	xMotorParam[YAW].ID = 0x01;
- 	xMotorParam[YAW].Name = "YAW轴";
+ 	xMotorParam[YAW].Name = "YAW";
  	xMotorParam[YAW].FeedbackMode = EcoFeedback;
  	xMotorParam[YAW].CloseLoopMode = PosClsloop;
  	xMotorParam[YAW].MeasureDM = &xMotorDMMeasure[YAW];
@@ -95,7 +95,7 @@ pid_t xMotorPid[2][2][MOTOR_NUM];
  	// xMotorParam[YAW].MeasureDM ->reverse_derection = 1;
 
  	xMotorParam[PITCH].ID = 0x02;
- 	xMotorParam[PITCH].Name = "PITCH轴";
+ 	xMotorParam[PITCH].Name = "PITCH";
  	xMotorParam[PITCH].FeedbackMode = EcoFeedback;
  	xMotorParam[PITCH].CloseLoopMode = PosClsloop;
  	xMotorParam[PITCH].MeasureDM = &xMotorDMMeasure[PITCH];
@@ -220,6 +220,14 @@ int float_to_uint(float x, float x_min, float x_max, int bits)
 
 
 
+/**********************************************************************************************************************
+  * @Func	 void PidCalcIMU(motor_param_t * ptr)
+  * @Brief   基于IMU反馈的电机PID计算
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  * @Retval	 无
+  * @Note    根据电机类型(DJI/DM)和闭环模式(位置/速度)进行位置-速度串级PID或速度单环PID计算，
+			计算结果经反向处理后写入CurrentOutput
+*********************************************************************************************************************/
 void PidCalcIMU(motor_param_t * ptr)
 {
 	switch(ptr->MotorType)
@@ -293,6 +301,14 @@ void PidCalcIMU(motor_param_t * ptr)
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void PidCalcEco(motor_param_t * ptr)
+  * @Brief   基于编码器反馈的电机PID计算
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  * @Retval	 无
+  * @Note    根据电机类型(DJI/DM)和闭环模式(位置/速度)进行位置-速度串级PID或速度单环PID计算，
+			计算结果经反向处理后写入CurrentOutput
+*********************************************************************************************************************/
 void PidCalcEco(motor_param_t * ptr)
 {
 		switch(ptr->MotorType)
@@ -373,6 +389,13 @@ void PidCalcEco(motor_param_t * ptr)
 
 }
 
+/**********************************************************************************************************************
+  * @Func	 void MotorCalc(motor_param_t * pxMotorParam)
+  * @Brief   电机控制计算调度函数
+  * @Param	 motor_param_t *pxMotorParam：电机参数结构体指针
+  * @Retval	 无
+  * @Note    根据反馈模式(EcoFeedback/IMUFeedback)选择调用对应的PID计算函数
+*********************************************************************************************************************/
 void MotorCalc(motor_param_t * pxMotorParam)
  {
  	if(pxMotorParam->FeedbackMode == EcoFeedback)

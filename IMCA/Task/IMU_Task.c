@@ -10,6 +10,16 @@ IMU_t IMU_Yaw;
 IMU_t IMU_Pitch;
 IMU_t IMU_Roll;
 
+/**********************************************************************************************************************
+  * @Func	 void Imu_param_update(receive_imusol_packet_t *Super_imu, IMU_t *IMU_Y, IMU_t *IMU_P, IMU_t *IMU_R)
+  * @Brief   更新IMU三轴姿态数据
+  * @Param	 receive_imusol_packet_t *Super_imu：超级电容IMU原始数据包
+  *          IMU_t *IMU_Y：YAW轴数据结构体指针
+  *          IMU_t *IMU_P：PITCH轴数据结构体指针
+  *          IMU_t *IMU_R：ROLL轴数据结构体指针
+  * @Retval	 无
+  * @Note    更新欧拉角、角速度、线加速度，含过180度跨圈处理
+*********************************************************************************************************************/
 void Imu_param_update(receive_imusol_packet_t *Super_imu, IMU_t *IMU_Y, IMU_t *IMU_P, IMU_t *IMU_R)
 {
     /*更新PITCH轴数据*/
@@ -86,6 +96,14 @@ void Imu_param_update(receive_imusol_packet_t *Super_imu, IMU_t *IMU_Y, IMU_t *I
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void MotorImuUpdata(motor_param_t * ptr, IMU_t * pxIMU)
+  * @Brief   将IMU数据更新到电机参数中
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  *          IMU_t *pxIMU：IMU数据结构体指针
+  * @Retval	 无
+  * @Note    更新电机的IMU角度、总角度、角速度和车载角度(减去偏移)
+*********************************************************************************************************************/
 void MotorImuUpdata(motor_param_t * ptr, IMU_t * pxIMU)
 {
     /*是否使用eco补偿imu*/

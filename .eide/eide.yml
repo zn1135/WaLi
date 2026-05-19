@@ -1,0 +1,320 @@
+version: "4.1"
+name: G474_Example
+type: ARM
+deviceName: null
+packDir: null
+srcDirs: []
+virtualFolder:
+  name: <virtual_root>
+  files: []
+  folders:
+    - name: Application
+      files: []
+      folders:
+        - name: MDK-ARM
+          files:
+            - path: MDK-ARM/startup_stm32g474xx.s
+          folders: []
+        - name: User
+          files: []
+          folders:
+            - name: Core
+              files:
+                - path: Core/Src/main.c
+                - path: Core/Src/gpio.c
+                - path: Core/Src/app_freertos.c
+                - path: Core/Src/adc.c
+                - path: Core/Src/dma.c
+                - path: Core/Src/fdcan.c
+                - path: Core/Src/usart.c
+                - path: Core/Src/tim.c
+                - path: Core/Src/stm32g4xx_it.c
+                - path: Core/Src/stm32g4xx_hal_msp.c
+                - path: Core/Src/stm32g4xx_hal_timebase_tim.c
+              folders: []
+            - name: USB_Device
+              files: []
+              folders:
+                - name: Target
+                  files:
+                    - path: USB_Device/Target/usbd_conf.c
+                  folders: []
+                - name: App
+                  files:
+                    - path: USB_Device/App/usb_device.c
+                    - path: USB_Device/App/usbd_desc.c
+                    - path: USB_Device/App/usbd_cdc_if.c
+                  folders: []
+    - name: Drivers
+      files: []
+      folders:
+        - name: STM32G4xx_HAL_Driver
+          files:
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim_ex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pcd.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pcd_ex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_ll_usb.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma_ex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_adc.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_adc_ex.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_ll_adc.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_fdcan.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart.c
+            - path: Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c
+          folders: []
+        - name: CMSIS
+          files:
+            - path: Core/Src/system_stm32g4xx.c
+          folders: []
+    - name: Middlewares
+      files: []
+      folders:
+        - name: FreeRTOS
+          files:
+            - path: Middlewares/Third_Party/FreeRTOS/Source/croutine.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/event_groups.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/list.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/queue.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/stream_buffer.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/tasks.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/timers.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_4.c
+            - path: Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/port.c
+          folders: []
+        - name: USB_Device_Library
+          files:
+            - path: Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c
+            - path: Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c
+            - path: Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c
+            - path: Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c
+          folders: []
+        - name: Library
+          files: []
+          folders:
+            - name: DSP Library
+              files: []
+              folders:
+                - name: DSP Library
+                  files:
+                    - path: Middlewares/ST/ARM/DSP/Lib/arm_cortexM4lf_math.lib
+                  folders: []
+    - name: IMCA
+      files:
+        - path: IMCA/Judge/Driver_Judge.c
+        - path: IMCA/Judge/Driver_Judge.h
+        - path: IMCA/Judge/Judge_interact.c
+        - path: IMCA/Judge/Judge_interact.h
+        - path: IMCA/Judge/UI.c
+        - path: IMCA/Judge/UI.h
+        - path: IMCA/Judge/ui_picTask.c
+        - path: IMCA/Judge/UI_STRUCT.h
+        - path: IMCA/Task/CanBus_Task.c
+        - path: IMCA/Task/CanBus_Task.h
+        - path: IMCA/Task/ChassisControl.c
+        - path: IMCA/Task/ChassisControl.h
+        - path: IMCA/Task/ControlTask.c
+        - path: IMCA/Task/ControlTask.h
+        - path: IMCA/Task/GimbalControl.c
+        - path: IMCA/Task/GimbalControl.h
+        - path: IMCA/Task/imu_data_decode.c
+        - path: IMCA/Task/imu_data_decode.h
+        - path: IMCA/Task/IMU_Task.c
+        - path: IMCA/Task/IMU_Task.h
+        - path: IMCA/Task/packet.c
+        - path: IMCA/Task/packet.h
+        - path: IMCA/Task/RcTask.c
+        - path: IMCA/Task/RcTask.h
+        - path: IMCA/Task/ShootControl.c
+        - path: IMCA/Task/ShootControl.h
+        - path: IMCA/Task/UartTask.c
+        - path: IMCA/Task/UartTask.h
+        - path: IMCA/Tool/adc_handle.c
+        - path: IMCA/Tool/adc_handle.h
+        - path: IMCA/Tool/CapInteract.c
+        - path: IMCA/Tool/CapInteract.h
+        - path: IMCA/Tool/INS_task.c
+        - path: IMCA/Tool/INS_task.h
+        - path: IMCA/Tool/kalman_filter.c
+        - path: IMCA/Tool/kalman_filter.h
+        - path: IMCA/Tool/Motor.c
+        - path: IMCA/Tool/Motor.h
+        - path: IMCA/Tool/pid.c
+        - path: IMCA/Tool/pid.h
+        - path: IMCA/Tool/PowerLimit.c
+        - path: IMCA/Tool/PowerLimit.h
+        - path: IMCA/Tool/Ramp.h
+        - path: IMCA/Tool/Ramp.c
+        - path: IMCA/Tool/VBatSense.c
+        - path: IMCA/Tool/VBatSense.h
+        - path: IMCA/Tool/Vision_interact.c
+        - path: IMCA/Tool/Vision_interact.h
+        - path: IMCA/Tool/Vofa_send.c
+        - path: IMCA/Tool/Vofa_send.h
+        - path: IMCA/User/user_lib.c
+        - path: IMCA/User/user_lib.h
+      folders: []
+    - name: ::CMSIS
+      files: []
+      folders: []
+dependenceList: []
+outDir: build
+miscInfo:
+  uid: 3e86e962c4a6d96d57f8a9b8455ff52b
+targets:
+  G474_Example:
+    cppPreprocessAttrs:
+      defineList:
+        - USE_HAL_DRIVER
+        - STM32G474xx
+      incList:
+        - Core/Inc
+        - USB_Device/App
+        - USB_Device/Target
+        - Drivers/STM32G4xx_HAL_Driver/Inc
+        - Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
+        - Middlewares/Third_Party/FreeRTOS/Source/include
+        - Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2
+        - Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F
+        - Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+        - Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc
+        - Drivers/CMSIS/Device/ST/STM32G4xx/Include
+        - Drivers/CMSIS/Include
+        - Middlewares/ST/ARM/DSP/Inc
+        - IMCA/Judge
+        - IMCA/Task
+        - IMCA/Tool
+        - IMCA/User
+        - .cmsis/include
+        - MDK-ARM/RTE/_G474_Example
+      libList: []
+    excludeList: []
+    settings: {}
+    toolchain: AC5
+    toolchainConfigMap:
+      AC5:
+        archExtensions: ""
+        cpuType: Cortex-M4
+        floatingPointHardware: single
+        options:
+          version: 4
+          afterBuildTasks: []
+          asm-compiler:
+            defines: []
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            CXX_FLAGS: --diag_suppress=1 --diag_suppress=1295
+            C_FLAGS: --diag_suppress=1 --diag_suppress=1295
+            c99-mode: true
+            one-elf-section-per-function: true
+            optimization: level-3
+            warnings: all-warnings
+          global:
+            output-debug-info: enable
+            use-microLIB: false
+          linker:
+            $outputTaskExcludes:
+              - .bin
+            output-format: elf
+            ro-base: ""
+            rw-base: ""
+            xo-base: ""
+        scatterFilePath: ""
+        storageLayout:
+          RAM:
+            - id: 1
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 2
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 3
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: RAM
+            - id: 1
+              isChecked: true
+              mem:
+                size: "0x20000"
+                startAddr: "0x20000000"
+              noInit: false
+              tag: IRAM
+            - id: 2
+              isChecked: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              noInit: false
+              tag: IRAM
+          ROM:
+            - id: 1
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 2
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 3
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: ROM
+            - id: 1
+              isChecked: true
+              isStartup: true
+              mem:
+                size: "0x20000"
+                startAddr: "0x8000000"
+              tag: IROM
+            - id: 2
+              isChecked: false
+              isStartup: false
+              mem:
+                size: "0x0"
+                startAddr: "0x0"
+              tag: IROM
+        useCustomScatterFile: false
+    uploadConfigMap:
+      JLink:
+        baseAddr: ""
+        bin: ""
+        cpuInfo:
+          cpuName: "null"
+          vendor: "null"
+        otherCmds: ""
+        proType: 1
+        speed: 8000
+    uploader: JLink

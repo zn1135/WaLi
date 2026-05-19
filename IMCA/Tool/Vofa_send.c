@@ -11,6 +11,14 @@ Vofa_data_m_4 Vofa_data_4={.tail={0x00,0x00,0x80,0x7f}};
 Vofa_data_m_8 Vofa_data_8={.tail={0x00,0x00,0x80,0x7f}};
 Vofa_data_m_16 Vofa_data_16={.tail={0x00,0x00,0x80,0x7f}};
 
+/**********************************************************************************************************************
+  * @Func	 void Vofa_Send_Data2(float data1, float data2)
+  * @Brief   VOFA调试助手发送2通道数据
+  * @Param	 float data1：通道1数据
+  *          float data2：通道2数据
+  * @Retval	 无
+  * @Note    通过UART1 DMA发送，帧尾为0x00 0x00 0x80 0x7f
+*********************************************************************************************************************/
 void Vofa_Send_Data2(float data1, float data2)
 {
 	Vofa_data_2.ch_data[0] = data1;
@@ -18,6 +26,13 @@ void Vofa_Send_Data2(float data1, float data2)
 	HAL_UART_Transmit_DMA(&huart1, (uint8_t *)&Vofa_data_2, sizeof(Vofa_data_2));   
 }
 
+/**********************************************************************************************************************
+  * @Func	 void Vofa_Send_Data4(float data1, float data2, float data3, float data4)
+  * @Brief   VOFA调试助手发送4通道数据
+  * @Param	 float data1~data4：通道1~4数据
+  * @Retval	 无
+  * @Note    通过UART1 DMA发送
+*********************************************************************************************************************/
 void Vofa_Send_Data4(float data1, float data2,float data3, float data4)
 {
 	Vofa_data_4.ch_data[0] = data1;
@@ -27,6 +42,13 @@ void Vofa_Send_Data4(float data1, float data2,float data3, float data4)
 	HAL_UART_Transmit_DMA(&huart1, (uint8_t *)&Vofa_data_4, sizeof(Vofa_data_4));   
 }
 
+/**********************************************************************************************************************
+  * @Func	 void Vofa_Send_Data8(float data1, float data2, float data3, float data4, float data5, float data6, float data7, float data8)
+  * @Brief   VOFA调试助手发送8通道数据
+  * @Param	 float data1~data8：通道1~8数据
+  * @Retval	 无
+  * @Note    通过UART1 DMA发送
+*********************************************************************************************************************/
 void Vofa_Send_Data8(float data1, float data2,float data3, float data4,float data5, float data6,float data7, float data8)
 {
 	Vofa_data_8.ch_data[0] = data1;
@@ -40,6 +62,13 @@ void Vofa_Send_Data8(float data1, float data2,float data3, float data4,float dat
 	HAL_UART_Transmit_DMA(&huart1, (uint8_t *)&Vofa_data_8, sizeof(Vofa_data_8));   
 }
 
+/**********************************************************************************************************************
+  * @Func	 void Vofa_Send_Data16(float data1, ..., float data16)
+  * @Brief   VOFA调试助手发送16通道数据
+  * @Param	 float data1~data16：通道1~16数据
+  * @Retval	 无
+  * @Note    通过UART1 DMA发送
+*********************************************************************************************************************/
 void Vofa_Send_Data16(float data1, float data2,float data3, float data4,float data5, float data6,float data7, float data8,
 	float data9, float data10,float data11, float data12,float data13, float data14,float data15, float data16)
 {

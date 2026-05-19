@@ -24,6 +24,13 @@ FDCAN_TxHeaderTypeDef tx_header;
 uint8_t tx_data[8];
 int16_t CanBuff[3][2][4];
 
+/**********************************************************************************************************************
+  * @Func	 void CANFilterInit(void)
+  * @Brief   CAN总线滤波器初始化
+  * @Param	 无
+  * @Retval	 无
+  * @Note    配置3路FDCAN的滤波器并启动，激活RX FIFO0新消息中断
+*********************************************************************************************************************/
 void CANFilterInit(void) {
     FDCAN_FilterTypeDef CAN_FilterConfigStructure;
 
@@ -49,6 +56,14 @@ void CANFilterInit(void) {
     HAL_FDCAN_ActivateNotification(&hfdcan3,FDCAN_IT_RX_FIFO0_NEW_MESSAGE,FDCAN_TX_BUFFER2);
 }
 
+/**********************************************************************************************************************
+  * @Func	 void SetCanFronMotorValue(FDCAN_HandleTypeDef *hcan, int16_t iq1, int16_t iq2, int16_t iq3, int16_t iq4)
+  * @Brief   CAN1发送前侧四个底盘电机电流值
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          int16_t iq1~iq4：四个电机的电流设定值
+  * @Retval	 无
+  * @Note    使用CAN ID 0x200，每个电流占2字节(高8位+低8位)
+*********************************************************************************************************************/
 void SetCanFronMotorValue(FDCAN_HandleTypeDef *hcan, int16_t iq1, int16_t iq2, int16_t iq3, int16_t iq4) {
     tx_header.Identifier = 0x200;
     tx_header.IdType = FDCAN_STANDARD_ID;
@@ -69,6 +84,14 @@ void SetCanFronMotorValue(FDCAN_HandleTypeDef *hcan, int16_t iq1, int16_t iq2, i
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void SetCanBackMotorValue(FDCAN_HandleTypeDef *hcan, int16_t iq1, int16_t iq2, int16_t iq3, int16_t iq4)
+  * @Brief   CAN2发送后侧四个电机电流值
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          int16_t iq1~iq4：四个电机(高度/摩擦轮R/摩擦轮L/拨弹轮)的电流设定值
+  * @Retval	 无
+  * @Note    使用CAN ID 0x1FF
+*********************************************************************************************************************/
 void SetCanBackMotorValue(FDCAN_HandleTypeDef *hcan, int16_t iq1, int16_t iq2, int16_t iq3, int16_t iq4) {
     tx_header.Identifier = 0x1FF;
     tx_header.IdType = FDCAN_STANDARD_ID;
@@ -88,6 +111,14 @@ void SetCanBackMotorValue(FDCAN_HandleTypeDef *hcan, int16_t iq1, int16_t iq2, i
     HAL_FDCAN_AddMessageToTxFifoQ(hcan, &tx_header, tx_data);
 }
 
+/**********************************************************************************************************************
+  * @Func	 void set_DM_J4310_motor_State(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t function)
+  * @Brief   设置DM_J4310电机状态(使能/失能/零点保存/清除错误)
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          uint16_t id：电机CAN ID
+  *          uint8_t function：功能码(enable/disable/save_zero_point/clear_error)
+  * @Retval	 无
+*********************************************************************************************************************/
 void set_DM_J4310_motor_State(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t function) {
     tx_header.Identifier = id;
     tx_header.IdType = FDCAN_STANDARD_ID;
@@ -116,6 +147,14 @@ void set_DM_J4310_motor_State(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t fu
     HAL_FDCAN_AddMessageToTxFifoQ(hcan, &tx_header, tx_data);
 }
 
+/**********************************************************************************************************************
+  * @Func	 void set_DM_J4310_SPD_info(FDCAN_HandleTypeDef *hcan, uint16_t id, float _vel)
+  * @Brief   设置DM_J4310电机速度模式目标值
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          uint16_t id：电机CAN ID
+  *          float _vel：目标速度值
+  * @Retval	 无
+*********************************************************************************************************************/
 void set_DM_J4310_SPD_info(FDCAN_HandleTypeDef *hcan, uint16_t id, float _vel) {
     uint8_t *vbuf;
     vbuf = (uint8_t *) &_vel;
@@ -133,6 +172,19 @@ void set_DM_J4310_SPD_info(FDCAN_HandleTypeDef *hcan, uint16_t id, float _vel) {
     HAL_FDCAN_AddMessageToTxFifoQ(hcan, &tx_header, tx_data);
 }
 
+/**********************************************************************************************************************
+  * @Func	 void set_DM_J4310_MIT_info(FDCAN_HandleTypeDef *hcan, uint16_t id, float _pos, float _vel, float _KP, float _KD, float _torq)
+  * @Brief   设置DM_J4310电机MIT模式控制信息
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          uint16_t id：电机CAN ID
+  *          float _pos：目标位置
+  *          float _vel：目标速度
+  *          float _KP：位置环比例系数
+  *          float _KD：速度环微分系数
+  *          float _torq：前馈力矩
+  * @Retval	 无
+  * @Note    将浮点参数经float_to_uint转换后按MIT协议打包发送
+*********************************************************************************************************************/
 void set_DM_J4310_MIT_info(FDCAN_HandleTypeDef *hcan,
 
                             uint16_t id, float _pos, float _vel,
@@ -166,6 +218,14 @@ void set_DM_J4310_MIT_info(FDCAN_HandleTypeDef *hcan,
 
 
 
+/**********************************************************************************************************************
+  * @Func	 void set_link_motor_State(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t function)
+  * @Brief   设置LINK电机状态(使能/失能/零点保存)
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          uint16_t id：电机CAN ID
+  *          uint8_t function：功能码(enable/disable/save_zero_point)
+  * @Retval	 无
+*********************************************************************************************************************/
 void set_link_motor_State(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t function) {
     tx_header.Identifier = id;
     tx_header.IdType = FDCAN_STANDARD_ID;
@@ -189,6 +249,14 @@ void set_link_motor_State(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t functi
     HAL_FDCAN_AddMessageToTxFifoQ(hcan, &tx_header, tx_data);
 }
 
+/**********************************************************************************************************************
+  * @Func	 void set_link_motor_iq(FDCAN_HandleTypeDef *hcan, uint16_t id, int16_t iq)
+  * @Brief   设置LINK电机电流值
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          uint16_t id：电机CAN ID
+  *          int16_t iq：电流设定值
+  * @Retval	 无
+*********************************************************************************************************************/
 void set_link_motor_iq(FDCAN_HandleTypeDef *hcan, uint16_t id, int16_t iq) {
     tx_header.Identifier = id;
     tx_header.IdType = FDCAN_STANDARD_ID;
@@ -205,6 +273,14 @@ void set_link_motor_iq(FDCAN_HandleTypeDef *hcan, uint16_t id, int16_t iq) {
     HAL_FDCAN_AddMessageToTxFifoQ(hcan, &tx_header, tx_data);
 }
 
+/**********************************************************************************************************************
+  * @Func	 void GetMotorMeasureNew(motor_param_t *motor_param, const uint8_t can_rx_data[])
+  * @Brief   解析CAN接收的电机测量数据
+  * @Param	 motor_param_t *motor_param：电机参数结构体指针
+  *          const uint8_t can_rx_data[]：CAN接收数据缓冲区
+  * @Retval	 无
+  * @Note    根据电机类型(DJI/DM/LINK)分别解析角度、转速、电流和位置信息
+*********************************************************************************************************************/
 void GetMotorMeasureNew(motor_param_t *motor_param, const uint8_t can_rx_data[]) {
     motor_param->Timeout_Flag++;
     switch (motor_param->MotorType) {
@@ -247,6 +323,13 @@ void GetMotorMeasureNew(motor_param_t *motor_param, const uint8_t can_rx_data[])
     }
 }
 
+/**********************************************************************************************************************
+  * @Func	 void GetChassisMes(uint8_t buff[])
+  * @Brief   解析底盘通用信息
+  * @Param	 uint8_t buff[]：接收数据缓冲区
+  * @Retval	 无
+  * @Note    提取YAW标志、血量标志和颜色信息
+*********************************************************************************************************************/
 void GetChassisMes(uint8_t buff[])
 {
     yaw_flag =buff[0];
@@ -258,6 +341,13 @@ void GetChassisMes(uint8_t buff[])
 
 
 
+/**********************************************************************************************************************
+  * @Func	 void MotorCanSendCurrent(void)
+  * @Brief   通过CAN总线发送所有电机控制电流
+  * @Param	 无
+  * @Retval	 无
+  * @Note    根据控制模式(LOSE/RC/PC)决定电机使能状态，发送底盘/云台/摩擦轮/拨弹轮电流
+*********************************************************************************************************************/
 void MotorCanSendCurrent(void) {
     if (xRobotMode.CtrlMode == LOSE) {
         set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID, disable);
@@ -316,6 +406,14 @@ void MotorCanSendCurrent(void) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void GetMotorOffset(motor_param_t *ptr, uint8_t can_rx_data[])
+  * @Brief   获取电机编码器初始偏移值
+  * @Param	 motor_param_t *ptr：电机参数结构体指针
+  *          uint8_t can_rx_data[]：CAN接收数据缓冲区
+  * @Retval	 无
+  * @Note    读取当前编码器角度作为零点偏移，用于后续角度计算
+*********************************************************************************************************************/
 void GetMotorOffset(motor_param_t *ptr, uint8_t can_rx_data[])
 {
     ptr->MeasureEco->angle = (uint16_t)(can_rx_data[0]<<8 | can_rx_data[1]) ;
@@ -384,6 +482,14 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     }
 }
 
+/**********************************************************************************************************************
+  * @Func	 void send_can2can(FDCAN_HandleTypeDef *hcan, uint16_t id, uint8_t iq1, ..., uint8_t iq8)
+  * @Brief   通用CAN数据发送函数
+  * @Param	 FDCAN_HandleTypeDef *hcan：FDCAN句柄
+  *          uint16_t id：CAN报文ID
+  *          uint8_t iq1~iq8：8字节发送数据
+  * @Retval	 无
+*********************************************************************************************************************/
 void send_can2can(FDCAN_HandleTypeDef *hcan,uint16_t id,uint8_t iq1, uint8_t iq2, uint8_t iq3, uint8_t iq4, uint8_t iq5, uint8_t iq6, uint8_t iq7, uint8_t iq8)
 {
 

@@ -1,16 +1,16 @@
 #include "PowerLimit.h"
-#include "CanBus_Task.h"
 #include "../Judge/Driver_Judge.h"
+#include "CanBus_Task.h"
 #include "Judge_interact.h"
 // #include "../Judge/CapInteract.h"
 #include "CapInteract.h"
-#include "Pid.h"
 #include "ChassisControl.h"
-#include "motor.h"
+#include "Pid.h"
 #include "RcTask.h"
+#include "motor.h"
 #include "user_lib.h"
 
-#define ABS(x) ((x) > 0 ? (x) : (-(x)))  // ¾ø¶ÔÖµºê
+#define ABS(x) ((x) > 0 ? (x) : (-(x))) // ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½
 
 power_t power;
 
@@ -19,23 +19,30 @@ power_t power;
 //        model->k3 * ABS(model->real_current) * ABS(model->real_current) +
 //        model->a/4;
 // k1, k2, k3, a, real_current, PowLim_IQ
-// µç»ú¹¦ÂÊÄ£ĞÍ²ÎÊı£¨Í¨¹ıÄâºÏµÃµ½£©
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í²ï¿½ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ÏµÃµï¿½ï¿½ï¿½
 model_t model[4] = {
 
-    {2.513e-06, 2.861e-07,   2.747e-07, 9.28, 0, 0}, // ÂÖ×Ó 1
-    {2.539e-06, 1.932e-07, 2.571e-07 , 9.37 , 0, 0},// ÂÖ×Ó 2
-    {2.689e-06, 2.283e-07,  2.766e-07,  9.14, 0, 0},  // ÂÖ×Ó 3
-    {2.399e-06, 2.415e-07, 2.915e-07, 10.47, 0, 0}  // ÂÖ×Ó 4
+    {2.513e-06, 2.861e-07, 2.747e-07, 9.28, 0, 0}, // ï¿½ï¿½ï¿½ï¿½ 1
+    {2.539e-06, 1.932e-07, 2.571e-07, 9.37, 0, 0}, // ï¿½ï¿½ï¿½ï¿½ 2
+    {2.689e-06, 2.283e-07, 2.766e-07, 9.14, 0, 0}, // ï¿½ï¿½ï¿½ï¿½ 3
+    {2.399e-06, 2.415e-07, 2.915e-07, 10.47, 0, 0} // ï¿½ï¿½ï¿½ï¿½ 4
 };
 
-// // ³¬¼¶µçÈİ¹¦ÂÊÄâºÏ²ÎÊı£¨MATLAB ÄâºÏµÃµ½£©
+// // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¹ï¿½ï¿½ï¿½ï¿½ï¿½Ï²ï¿½ï¿½ï¿½ï¿½ï¿½MATLAB ï¿½ï¿½ÏµÃµï¿½ï¿½ï¿½
 // cap_t cap_power = {0.0026, -0.0066, -0.13, -1.16, 84.79, 0};
 
-// ¼òµ¥»¬¶¯Æ½¾ùÂË²¨£¬a ±íÊ¾Í¨µÀË÷Òı£¨0~3£©
+/**********************************************************************************************************************
+ * @Func	 float averageFilter(uint8_t a, float in_data)
+ * @Brief   ç®€å•æ»‘åŠ¨å¹³å‡æ»¤æ³¢å™¨
+ * @Param	 uint8_t aï¼šé€šé“ç¼–å·(0~3)
+ *          float in_dataï¼šè¾“å…¥æ•°æ®
+ * @Retval	 floatï¼šæ»¤æ³¢åçš„å¹³å‡å€¼
+ * @Note    æ¯è·¯é€šé“ä¿ç•™20ä¸ªå†å²æ•°æ®ç‚¹ï¼Œè¿”å›æ»‘åŠ¨å¹³å‡å€¼
+ *********************************************************************************************************************/
 float averageFilter(uint8_t a, float in_data)
 {
     float sum = 0.0f;
-    static float data[4][20]; // 4 Â·£¬Ã¿Â· 10 µãÀúÊ·Êı¾İ
+    static float data[4][20]; // 4 Â·ï¿½ï¿½Ã¿Â· 10 ï¿½ï¿½ï¿½ï¿½Ê·ï¿½ï¿½ï¿½ï¿½
 
     for (int i = 0; i < 19; i++)
     {
@@ -49,30 +56,44 @@ float averageFilter(uint8_t a, float in_data)
     return sum / 20.0f;
 }
 
-// µ¥¸öµç»ú¹¦ÂÊ¹ÀËãÄ£ĞÍ
+/**********************************************************************************************************************
+ * @Func	 double PowerMotorLimit(model_t *model, motor_param_t *Chassis_Motor)
+ * @Brief   æ ¹æ®ç”µæœºåŠŸç‡æ¨¡å‹è®¡ç®—å•ä¸ªç”µæœºåŠŸç‡
+ * @Param	 model_t *modelï¼šåŠŸç‡æ¨¡å‹å‚æ•°ç»“æ„ä½“æŒ‡é’ˆ
+ *          motor_param_t *Chassis_Motorï¼šåº•ç›˜ç”µæœºå‚æ•°ç»“æ„ä½“æŒ‡é’ˆ
+ * @Retval	 doubleï¼šè®¡ç®—å¾—åˆ°çš„ç”µæœºåŠŸç‡å€¼
+ * @Note    ä½¿ç”¨å…¬å¼ k1*I*w + k2*w^2 + k3*I^2 + a/4 è®¡ç®—åŠŸç‡
+ *********************************************************************************************************************/
 double PowerMotorLimit(model_t *model, motor_param_t *Chassis_Motor)
 {
-    // Ô­Ê¼°æ±¾£ºk1 * I * w + k2 * w^2 + a
-    // ÕâÀïÊ¹ÓÃ²âÁ¿Öµ MeasureEco ÖĞµÄ×ªËÙÓëµçÁ÷
+    // Ô­Ê¼ï¿½æ±¾ï¿½ï¿½k1 * I * w + k2 * w^2 + a
+    // ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã²ï¿½ï¿½ï¿½Öµ MeasureEco ï¿½Ğµï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     return model->k1 * (model->real_current) * (Chassis_Motor->MeasureEco->speed_rpm) +
            model->k2 * (Chassis_Motor->MeasureEco->speed_rpm) * (Chassis_Motor->MeasureEco->speed_rpm) +
            model->k3 * (model->real_current) * (model->real_current) +
-           model->a/4;
+           model->a / 4;
     // return model->k1 * ABS(model->real_current) * ABS(Chassis_Motor->MeasureEco->speed_rpm) +
     //    model->k2 * ABS(Chassis_Motor->MeasureEco->speed_rpm) * ABS(Chassis_Motor->MeasureEco->speed_rpm) +
     //    model->k3 * ABS(model->real_current) * ABS(model->real_current) +
     //    model->a/4;
-
 }
 
-// ÒÔÏÂÎªÕû³µ¹¦ÂÊÏŞÖÆÂß¼­£¬ÒÀÀµ¶à¸öÍâ²¿·ûºÅ£¨Cap_Measure¡¢xMotorParam µÈ£©£¬ÈçĞèÆôÓÃÇë²¹ÆëÒÀÀµ
-void PowertotalLimit(void) {
-    // TODO: ÈçĞèÆôÓÃ¹¦ÂÊÏŞÖÆÂß¼­£¬Çë½â³ı´Ëº¯ÊıÖĞµÄ×¢ÊÍ£¬²¢È·±££º
-    // 1. WHEEL_RF / WHEEL_LF / WHEEL_LB / WHEEL_RB µÈºêÒÑÔÚµ×ÅÌÄ£¿éÖĞ¶¨Òå£»
-    // 2. xMotorParam¡¢Cap_Measure¡¢servo_state¡¢KEY_CTRL¡¢send_chassis_power_limit µÈ·ûºÅÒÑÔÚ¶ÔÓ¦Ä£¿éÖĞÉùÃ÷/¶¨Òå£»
+/**********************************************************************************************************************
+  * @Func	 void PowertotalLimit(void)
+  * @Brief   åº•ç›˜åŠŸç‡æ€»é™å¹…æ§åˆ¶
+  * @Param	 æ— 
+  * @Retval	 æ— 
+  * @Note    ç´¯åŠ å››ä¸ªåº•ç›˜ç”µæœºåŠŸç‡ï¼Œé€šè¿‡PIDæ§åˆ¶ä¸è£åˆ¤ç³»ç»ŸåŠŸç‡ä¸Šé™åšæ¯”è¾ƒï¼Œ
+            å¯¹æ¯ä¸ªåº•ç›˜çš„CurrentOutputåšç­‰æ¯”ä¾‹é™å¹…
+*********************************************************************************************************************/
+void PowertotalLimit(void)
+{
+    // TODO: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ëºï¿½ï¿½ï¿½ï¿½Ğµï¿½×¢ï¿½Í£ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½
+    // 1. WHEEL_RF / WHEEL_LF / WHEEL_LB / WHEEL_RB ï¿½Èºï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½Ğ¶ï¿½ï¿½å£»
+    // 2. xMotorParamï¿½ï¿½Cap_Measureï¿½ï¿½servo_stateï¿½ï¿½KEY_CTRLï¿½ï¿½send_chassis_power_limit ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¶ï¿½Ó¦Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½å£»
 
     power.motor = 0;
-    // µç»ú²à¹¦ÂÊÀÛ¼Ó
+    // ï¿½ï¿½ï¿½ï¿½à¹¦ï¿½ï¿½ï¿½Û¼ï¿½
     int i = 0;
     for (int i = 0; i < 4; i++)
     {
@@ -81,29 +102,29 @@ void PowertotalLimit(void) {
         power.motor += PowerMotorLimit(&model[i], &xMotorParam[i + WHEEL_FR]);
     }
     //
-    // ³¬¼¶µçÈİ¹¦ÂÊÓë×Ü¹¦ÂÊ
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½İ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½
     // power.cap = PowerCapLimit(&Cap_Measure);
     power.total = 1.0f * power.motor + 0.0f * power.cap;
     //
 
-    if ((Cap_Measure.cap_value / 10.0f >= 16.0f &&Cap_Measure.state_core == 161)||KEY_CTRL)
+    if ((Cap_Measure.cap_value / 10.0f >= 16.0f && Cap_Measure.state_core == 161) || KEY_CTRL)
     {
-        pid_calc(&Chassis_Power, power.total, send_chassis_power_limit() + 15.0f*Cap_Measure.cap_value/10.0f-5);
+        pid_calc(&Chassis_Power, power.total, send_chassis_power_limit() + 15.0f * Cap_Measure.cap_value / 10.0f - 5);
     }
     else
     {
-        pid_calc(&Chassis_Power, power.total, send_chassis_power_limit()-5);
+        pid_calc(&Chassis_Power, power.total, send_chassis_power_limit() - 5);
     }
 
     Chassis_Power.pos_out = (Chassis_Power.pos_out + 1.0f) / 3.0f;
 
-    // µ±µçÈİµçÑ¹½Ï¸ßÇÒ¹¦ÂÊÏŞÖÆÏµÊı¹ıµÍÊ±£¬¸øÒ»¸öÏÂÏŞ±£»¤
+    // ï¿½ï¿½ï¿½ï¿½ï¿½İµï¿½Ñ¹ï¿½Ï¸ï¿½ï¿½Ò¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ş±ï¿½ï¿½ï¿½
     // if (Cap_Measure.cap_value / 10.0f >= 16.0f &&
     //     Chassis_Power.pos_out < 0.30f &&
     //     Cap_Measure.state_core == 161)
     // {
     //     Chassis_Power.pos_out = 0.30f;
-                                                                   // }
+    // }
     xMotorParam[WHEEL_FR].CurrentOutput = xMotorParam[WHEEL_FR].PidParamSpdEco->pos_out * Chassis_Power.pos_out;
     xMotorParam[WHEEL_FL].CurrentOutput = xMotorParam[WHEEL_FL].PidParamSpdEco->pos_out * Chassis_Power.pos_out;
     xMotorParam[WHEEL_BL].CurrentOutput = xMotorParam[WHEEL_BL].PidParamSpdEco->pos_out * Chassis_Power.pos_out;

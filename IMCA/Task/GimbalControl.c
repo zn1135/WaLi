@@ -29,6 +29,13 @@ uint8_t Stuck_Hight_flag = 0;
 // 高低位动作标志：0-空闲，1-执行到High，2-执行到Low
 uint8_t highlow_flag = 0;
 int32_t High_Low_Start_angle = 0;
+/**********************************************************************************************************************
+  * @Func	 void GimbalInit(void)
+  * @Brief   云台初始化函数
+  * @Param	 无
+  * @Retval	 无
+  * @Note    将Pitch/YAW拉到安全初始位置，等待电机稳定后切换到IMU反馈闭环并校准角度偏移
+*********************************************************************************************************************/
 void GimbalInit(void)
 {
     static uint16_t Gimbal_Init_count = 0;
@@ -58,6 +65,13 @@ void GimbalInit(void)
 }
 int znlook[10];
 
+/**********************************************************************************************************************
+  * @Func	 void GimbalControlSetValue(void)
+  * @Brief   云台控制量给定
+  * @Param	 无
+  * @Retval	 无
+  * @Note    处理RC/PC模式下的YAW/PITCH角度控制和自瞄逻辑，以及升降限位控制
+*********************************************************************************************************************/
 void GimbalControlSetValue(void) {
 
     static int AngleSaveFlag = 1, AutoSaveAngle = 1;

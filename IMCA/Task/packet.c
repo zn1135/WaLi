@@ -17,6 +17,15 @@ uint32_t frame_count;
 uint8_t Chaoneng_Imu; //IMU 200ms超时标志位
 uint32_t frame_rate;  //获取帧频率
 
+/**********************************************************************************************************************
+  * @Func	 static void crc16_update(uint16_t *currect_crc, const uint8_t *src, uint32_t len)
+  * @Brief   CRC16校验值更新
+  * @Param	 uint16_t *currect_crc：当前CRC值指针(输入/输出)
+  *          const uint8_t *src：源数据
+  *          uint32_t len：数据长度
+  * @Retval	 无
+  * @Note    用于IMU数据包的CRC16校验
+*********************************************************************************************************************/
 static void crc16_update(uint16_t *currect_crc, const uint8_t *src, uint32_t len)
 {
     uint32_t crc = *currect_crc;

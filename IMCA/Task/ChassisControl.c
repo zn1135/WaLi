@@ -11,6 +11,14 @@
 float chassis_vx_channel = 0, chassis_vy_channel = 0, chassis_vw_channel = 0;
 chassis_t Chassis;
 
+/**********************************************************************************************************************
+  * @Func	 float ChassisRotationPID(float measure, float target)
+  * @Brief   底盘旋转PID计算
+  * @Param	 float measure：当前测量值
+  *          float target：目标值
+  * @Retval	 float：PID输出值
+  * @Note    使用Chassis_Rotate PID结构体进行角度控制
+*********************************************************************************************************************/
 float ChassisRotationPID(float measure, float target) {
     pid_calc(&Chassis_Rotate, measure, target);
     return Chassis_Rotate.pos_out;
@@ -18,7 +26,15 @@ float ChassisRotationPID(float measure, float target) {
 
 uint16_t Stuck_YAW_cnt=0;
 int GYROSC_direction=-1;
-void  ChassisControlSetValue(void) {
+/**********************************************************************************************************************
+  * @Func	 void ChassisControlSetValue(void)
+  * @Brief   底盘控制量给定
+  * @Param	 无
+  * @Retval	 无
+  * @Note    根据控制模式(RC/PC/LOSE)和底盘模式(跟随/分离/小陀螺)设置vx/vy/vw通道值，
+            并进行一阶低通滤波和反向系数处理
+*********************************************************************************************************************/
+void ChassisControlSetValue(void) {
 
     GetGimbalFrontBackOrientation(&xMotorParam[YAW]);
 
@@ -170,6 +186,13 @@ void  ChassisControlSetValue(void) {
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void ChassisControl_Calculating(void)
+  * @Brief   底盘运动学解算
+  * @Param	 无
+  * @Retval	 无
+  * @Note    根据底盘模式(分离/跟随/小陀螺)将vx/vy/vw解算为四个麦轮的目标速度EcoTar
+*********************************************************************************************************************/
 void ChassisControl_Calculating(void) {
     float sin_rotate, cos_rotate;
     switch (xRobotMode.ChassisMode) {

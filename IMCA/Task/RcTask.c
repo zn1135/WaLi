@@ -37,6 +37,14 @@ uint8_t RC_TimeOut_cnt=0;
 
 
 
+/**********************************************************************************************************************
+  * @Func	 static uint32_t VT_GetBits(const uint8_t *buff, uint16_t start_bit, uint8_t bit_len)
+  * @Brief   从字节缓冲区按位提取数据
+  * @Param	 const uint8_t *buff：字节缓冲区
+  *          uint16_t start_bit：起始位偏移
+  *          uint8_t bit_len：提取的位长度
+  * @Retval	 uint32_t：提取的数值
+*********************************************************************************************************************/
 static uint32_t VT_GetBits(const uint8_t *buff, uint16_t start_bit, uint8_t bit_len) {
 	uint32_t value = 0;
 
@@ -48,6 +56,14 @@ static uint32_t VT_GetBits(const uint8_t *buff, uint16_t start_bit, uint8_t bit_
 	return value;
 }
 
+/**********************************************************************************************************************
+  * @Func	 void Callback_VT_Handle(VT_Type* vt, uint8_t* buff)
+  * @Brief   VT图传遥控器协议数据解析
+  * @Param	 VT_Type* vt：VT遥控器数据结构体指针
+  *          uint8_t* buff：接收数据缓冲区
+  * @Retval	 无
+  * @Note    解析帧头0xA9 0x53，提取摇杆、鼠标和键盘按键数据
+*********************************************************************************************************************/
 void Callback_VT_Handle(VT_Type* vt, uint8_t* buff) {
 		if (vt == 0 || buff == 0) {
 			return;
@@ -148,6 +164,14 @@ int16_t RcDeadlineLimit(int16_t input, uint8_t dealine)
     return output;
 }
 
+/**********************************************************************************************************************
+  * @Func	 void key_deshake(int16_t key_input, Key_deshake_t *data)
+  * @Brief   按键消抖处理
+  * @Param	 int16_t key_input：按键原始输入值
+  *          Key_deshake_t *data：按键消抖数据结构体指针
+  * @Retval	 无
+  * @Note    连续8次采样一致才更新消抖状态
+*********************************************************************************************************************/
 void key_deshake(int16_t key_input, Key_deshake_t *data)
 {
 	if(key_input)//��������
@@ -180,6 +204,13 @@ void key_deshake(int16_t key_input, Key_deshake_t *data)
 	}
 }
 
+/**********************************************************************************************************************
+  * @Func	 void deshake_all(void)
+  * @Brief   全局按键消抖更新
+  * @Param	 无
+  * @Retval	 无
+  * @Note    对所有鼠标按键和键盘按键(WSAD/SHIFT/CTRL/QERFGZXCVB)统一调用消抖函数
+*********************************************************************************************************************/
 void deshake_all(void)
 {
 	key_deshake(MOUSE_PRESS_LEFT, &mouse_left);

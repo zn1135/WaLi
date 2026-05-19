@@ -27,6 +27,15 @@ ext_client_custom_graphic_character_t  character;
 uint8_t UI_cnt=0;
 
 
+/**********************************************************************************************************************
+  * @Func	 void ChassisGuidance(uint16_t circle_point_x, uint16_t circle_point_y, uint8_t Radius)
+  * @Brief   底盘指向指南针绘制
+  * @Param	 uint16_t circle_point_x：圆心X坐标
+  *          uint16_t circle_point_y：圆心Y坐标
+  *          uint8_t Radius：指针半径
+  * @Retval	 无
+  * @Note    根据底盘相对角度计算指针端点坐标
+*********************************************************************************************************************/
 void ChassisGuidance(uint16_t circle_point_x,uint16_t circle_point_y,uint8_t Radius)  //底盘指向指南针
 {
 
@@ -43,6 +52,13 @@ void ChassisGuidance(uint16_t circle_point_x,uint16_t circle_point_y,uint8_t Rad
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void UI_TEST(uint8_t operate_)
+  * @Brief   客户端UI图形绘制任务
+  * @Param	 uint8_t operate_：操作类型(1=添加图形, 2=修改图形)
+  * @Retval	 无
+  * @Note    绘制7个图形(高度指示/子弹数/装甲板识别/电容值/模式切换/底盘指针/电容条)
+*********************************************************************************************************************/
 void UI_TEST(uint8_t operate_)
 {
     static uint8_t seq=0;
@@ -359,6 +375,17 @@ void UI_TEST(uint8_t operate_)
 
 
 /*UI发送一个字母*/
+/**********************************************************************************************************************
+  * @Func	 void UI_TEST_Character(char V1, uint32_t x, uint32_t y, uint8_t name, uint8_t operate_)
+  * @Brief   客户端UI发送单个字符
+  * @Param	 char V1：要显示的字符
+  *          uint32_t x：字符X坐标
+  *          uint32_t y：字符Y坐标
+  *          uint8_t name：图形名称ID
+  *          uint8_t operate_：操作类型
+  * @Retval	 无
+  * @Note    通过裁判系统串口发送字符图形数据包
+*********************************************************************************************************************/
 void UI_TEST_Character(char V1,uint32_t x ,uint32_t y,uint8_t name ,uint8_t operate_ )
 {
     uint16_t Cmd_ID;
@@ -413,6 +440,12 @@ void UI_TEST_Character(char V1,uint32_t x ,uint32_t y,uint8_t name ,uint8_t oper
     vTaskDelay(40);
 }
 
+/**********************************************************************************************************************
+  * @Func	 void UI_TEST_Character_BULLET(uint8_t operate_)
+  * @Brief   客户端UI发送子弹数字符串"BULLET"
+  * @Param	 uint8_t operate_：操作类型
+  * @Retval	 无
+*********************************************************************************************************************/
 void UI_TEST_Character_BULLET(uint8_t operate_)
 {
     uint16_t Cmd_ID;
@@ -479,6 +512,13 @@ void UI_TEST_Character_BULLET(uint8_t operate_)
 
 
 uint16_t RobotManReceiveID(void);
+/**********************************************************************************************************************
+  * @Func	 void Robot_Interact(void)
+  * @Brief   机器人间交互数据发送
+  * @Param	 无
+  * @Retval	 无
+  * @Note    通过裁判系统发送交互数据到操作手客户端
+*********************************************************************************************************************/
 void Robot_Interact(void)
 {
     uint16_t Cmd_ID;
@@ -522,6 +562,13 @@ void Robot_Interact(void)
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void UI_NEW_INIT(void)
+  * @Brief   UI基础静态图形初始化
+  * @Param	 无
+  * @Retval	 无
+  * @Note    绘制车体斜线、底盘直线、中心瞄准十字线等静态背景图形
+*********************************************************************************************************************/
 void UI_NEW_INIT(void)
 {
 
@@ -642,6 +689,13 @@ void UI_NEW_INIT(void)
 }
 
 
+/**********************************************************************************************************************
+  * @Func	 void UI_MODE_BUILD(void)
+  * @Brief   UI模式构建
+  * @Param	 无
+  * @Retval	 无
+  * @Note    绘制中心瞄准线等模式相关图形
+*********************************************************************************************************************/
 void UI_MODE_BUILD(void)
 {
     static uint8_t seq=0;
