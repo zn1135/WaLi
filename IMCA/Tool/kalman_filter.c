@@ -126,6 +126,15 @@
  ******************************************************************************
  */
 
+/* 让卡尔曼滤波器从 FreeRTOS 堆(configTOTAL_HEAP_SIZE=15360B)分配内存。
+ * 否则 kalman_filter.h 里 user_malloc 的守卫宏 _CMSIS_OS_H(CMSIS-RTOS V1 拼法)
+ * 在本 V2 工程永不命中，user_malloc 退化成标准 malloc，用的是仅 1KB 的 C 库堆
+ * (Heap_Size=0x400)；4 状态 KF 的 ~25 次分配(~1.1KB)会撑爆它，后段 K/S/temp 矩阵
+ * 拿到 NULL 且全程无 NULL 检查，卡尔曼增益恒 0、滤波退化为纯预测、状态永久冻结。
+ * 必须在包含本库头之前 #define，才能盖过头里的 #ifndef user_malloc。 */
+#include "FreeRTOS.h"
+#define user_malloc pvPortMalloc
+
 #include "kalman_filter.h"
 
 // 暂时没用设计，后续可以根据需要调整

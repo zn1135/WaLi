@@ -55,6 +55,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         IMCA/Tool/Ramp.c
         IMCA/Tool/kalman_filter.c
         IMCA/Tool/kalman_filter.h
+        IMCA/Tool/Odometry.c
+        IMCA/Tool/Odometry.h
         IMCA/Tool/INS_task.c
         IMCA/Tool/INS_task.h
         IMCA/Task/GimbalControl.c

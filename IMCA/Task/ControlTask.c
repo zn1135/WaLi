@@ -9,12 +9,12 @@
 #include "INS_task.h"
 #include "Judge_interact.h"
 #include "Motor.h"
+#include "Odometry.h"
 #include "PowerLimit.h"
 #include "Ramp.h"
 #include "RcTask.h"
 #include "ShootControl.h"
 #include "UartTask.h"
-#include "VBatSense.h"
 #include "Vision_interact.h"
 #include "Vofa_send.h"
 #include "adc_handle.h"
@@ -134,6 +134,7 @@ void TotalInitTask(void)
     FirstOrderFilterInit(&xChassisCmdSlowSetVw, CHASSIS_CONTROL_TIME, chassis_w_order_filter);
     // VBatSense_Init(&hadc3, &cfg);
     ADC_handle_Init();
+    Odometry_Init(); // 里程计(轮速+加速度融合)初始化
 }
 uint32_t vbat_mv = 0;
 
@@ -159,6 +160,7 @@ void TotalControl(void)
     // todo：陀螺仪坐标系和电机坐标系不一致，导致正负号错误，后续需要重新定义坐标系并修改相关代码
     //  xMotorParam[PITCH].MeasureImu->palstance = -xMotorParam[PITCH].MeasureDM->velocity;
 #endif
+    Odometry_Update(); // 里程计更新：麦轮逆解算 + 加速度卡尔曼融合 + 世界系积分
     CtrlModeSelect();
     FirstOrderFilterCali(&mouse_x, MOUSE_X); // 一阶低通滤波
     FirstOrderFilterCali(&mouse_y, MOUSE_Y); // 一阶低通滤波
@@ -237,14 +239,31 @@ void TotalControl(void)
     //           xMotorParam[YAW].CurrentOutput,
     //           sqrt((chassis_vx_channel*chassis_vx_channel+chassis_vy_channel*chassis_vy_channel))/CHASSIS_MAXSPEED
     // );
-    Vofa_Send_Data8(send_robot_hurt_id(),                                                      // 0
-                    send_robot_hurt_type(),                                                    // 1
-                    xMotorParam[PITCH].MeasureImu->palstance,                                  // 2
-                    xMotorParam[YAW].MeasureImu->palstance,                                    // 3
-                    xMotorParam[YAW].CurrentOutput,                                            // 4.
-                    xMotorParam[YAW].MeasureDM->velocity - xMotorParam[YAW].MeasureDM->last_v, // 5
-                    xMotorParam[YAW].MeasureDM->velocity,                                      // 6
-                    Stuck_YAW_cnt);
+    // Vofa_Send_Data8(send_robot_hurt_id(),                                                      // 0
+    //                 send_robot_hurt_type(),                                                    // 1
+    //                 xMotorParam[PITCH].MeasureImu->palstance,                                  // 2
+    //                 xMotorParam[YAW].MeasureImu->palstance,                                    // 3
+    //                 xMotorParam[YAW].CurrentOutput,                                            // 4.
+    //                 xMotorParam[YAW].MeasureDM->velocity - xMotorParam[YAW].MeasureDM->last_v, // 5
+    //                 xMotorParam[YAW].MeasureDM->velocity,                                      // 6
+    //                 Stuck_YAW_cnt);
+    // ===== 里程计标定打印（标定完成后可改回上面的打印）=====
+    // ch2/ch5 现在是【四元数去重力后】的机体系加速度。关键验证：
+    //   1) 车不动，用手俯仰/转动云台 -> ch2、ch5 应保持≈0、不随 pitch 变化。
+    //      若仍随云台姿态变化 -> 四元数约定不对，把 Odometry.c 里 ODOM_QUAT_CONJ 置 1 再试。
+    //   2) 推车前进 -> ch2 先正(加速)后负(减速)；右移 -> ch5 同理。
+    // ch0/ch3 轮速符号：前进 ch0>0、右移 ch3>0 为正确，反了翻 ODOM_VY_SIGN/ODOM_VX_SIGN。
+    // ch1/ch4(融合) 正常时贴着 ch0/ch3 走、会被盖住，要看就把 ch0/ch3 隐藏。
+    //   注意：必须【推动底盘】ch1/ch4 才有值；车静止时它们=0 是正常的。
+    // ch7 位置：直线推 1m 看是否≈1m，标定 CHASSIS_WHEEL_RADIUS。
+    Vofa_Send_Data8(Odom.wheel_vy,    // 0 前后速度（轮速逆解算）
+                    Odom.vy_body,     // 1 前后速度（卡尔曼融合，应贴着 ch0）
+                    Odom.acc_body_y,  // 2 前后加速度（去重力, m/s^2）
+                    Odom.wheel_vx,    // 3 左右速度（轮速逆解算）
+                    Odom.vx_body,     // 4 左右速度（卡尔曼融合，应贴着 ch3）
+                    Odom.acc_body_x,  // 5 左右加速度（去重力, m/s^2）
+                    Odom.yaw_chassis, // 6 底盘航向 (rad)
+                    Odom.pos_y);      // 7 前后位置 (m)
     // Vofa_Send_Data8(-MiniPC_ReceivePacket.pitch,//0
     //                 xMotorParam[PITCH].MeasureImu->angle, //1
     //                  xMotorParam[PITCH].TempCalc  , //2
