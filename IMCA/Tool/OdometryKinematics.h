@@ -1,0 +1,34 @@
+#ifndef ODOMETRY_KINEMATICS_H
+#define ODOMETRY_KINEMATICS_H
+
+typedef struct
+{
+    float vx_chassis;
+    float vy_chassis;
+    float rotation_linear;
+} OdomMecanumVelocity_t;
+
+static inline OdomMecanumVelocity_t Odom_DecodeMecanum(float fr,
+                                                        float fl,
+                                                        float br,
+                                                        float bl)
+{
+    OdomMecanumVelocity_t velocity;
+    velocity.vx_chassis = (bl - fl + br - fr) * 0.25f;
+    velocity.vy_chassis = (fl - fr + bl - br) * 0.25f;
+    velocity.rotation_linear = -(fr + fl + br + bl) * 0.25f;
+    return velocity;
+}
+
+static inline void Odom_ChassisToGimbal(float vx_chassis,
+                                         float vy_chassis,
+                                         float sin_relative_yaw,
+                                         float cos_relative_yaw,
+                                         float *vx_gimbal,
+                                         float *vy_gimbal)
+{
+    *vx_gimbal = vx_chassis * cos_relative_yaw - vy_chassis * sin_relative_yaw;
+    *vy_gimbal = vx_chassis * sin_relative_yaw + vy_chassis * cos_relative_yaw;
+}
+
+#endif // ODOMETRY_KINEMATICS_H
