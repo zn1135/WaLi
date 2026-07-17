@@ -11,7 +11,7 @@
 #include "arm_math.h"
 #include "kalman_filter.h"   // vaEstimateKF, Kalman_Filter_*
 #include "Motor.h"           // xMotorParam[]
-#include "user_lib.h"        // WHEEL_* 枚举, RPM_To_Rads, Reduction_Ratio, CHASSIS_WHEEL_RADIUS, PI, xRelativeAngle
+#include "user_lib.h"        // WHEEL_* 枚举, RPM_To_Rads, Reduction_Ratio, CHASSIS_WHEEL_RADIUS, PI, Gimbal_FrontAngle
 #include "IMU_Task.h"        // IMU_Yaw
 #include "imu_data_decode.h" // receive_imusol
 
@@ -189,11 +189,12 @@ void Odometry_Update(void)
     /* ---------- 1. 航向（世界系，以起始为 0） ---------- */
     float yaw_g_abs = ODOM_YAW_SIGN * IMU_Yaw.total_angle * DEG2RAD; // 云台绝对航向
 #if ODOM_IMU_ON_GIMBAL
-    float rel = ODOM_REL_SIGN * xRelativeAngle.receive_yaw_relative_rad; // 云台相对底盘
+    const float rel_motor = (xMotorParam[YAW].MeasureDM->position - Gimbal_FrontAngle) * DEG2RAD;
+    float rel = ODOM_REL_SIGN * rel_motor; // 云台相对底盘（电机角-云台正前角）
 #else
     float rel = 0.0f;
 #endif
-    float yaw_c_abs = yaw_g_abs - rel; // 底盘绝对航向
+    float yaw_c_abs = Odom_GimbalToChassisYaw(yaw_g_abs, rel); // 底盘绝对航向
 
     if (!Odom.inited)
     {

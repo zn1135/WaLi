@@ -121,6 +121,15 @@ static void ExpectRelativeGimbalForwardProjection(const char *case_name,
     AssertNear(case_name, "forward_velocity", actual_forward, expected_forward);
 }
 
+static void ExpectChassisYawFromGimbal(const char *case_name,
+                                       float gimbal_yaw,
+                                       float relative_yaw,
+                                       float expected_chassis_yaw)
+{
+    const float actual_chassis_yaw = Odom_GimbalToChassisYaw(gimbal_yaw, relative_yaw);
+    AssertNear(case_name, "chassis_yaw", actual_chassis_yaw, expected_chassis_yaw);
+}
+
 int main(void)
 {
     ExpectRecoveredGimbalVelocity("aligned", 0.35f, 1.20f, 0.0f, 0.0f);
@@ -134,6 +143,7 @@ int main(void)
     ExpectGimbalForwardProjection("gimbal_yaw_negative_quarter", 1.5f, 0.0f, -TEST_PI / 2.0f, 1.5f);
     ExpectGimbalForwardProjection("zero_world_velocity", 0.0f, 0.0f, 0.9f, 0.0f);
     ExpectRelativeGimbalForwardProjection("relative_gimbal_heading", 1.5f, 0.0f, TEST_PI / 2.0f, 0.0f, -1.5f);
+    ExpectChassisYawFromGimbal("chassis_yaw_from_gimbal_relative", 1.2f, 0.35f, 0.85f);
     ExpectGimbalForwardIntegration("forward_displacement_over_periods", 1.25f, 80, 0.001f, 0.1f);
 
     if (failures != 0)

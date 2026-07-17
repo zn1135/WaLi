@@ -71,4 +71,10 @@ static inline float Odom_WorldToGimbalForwardFromChassis(float vx_world,
                                      cos_gimbal_yaw);
 }
 
+static inline float Odom_GimbalToChassisYaw(float gimbal_yaw,
+                                             float relative_yaw)
+{
+    return gimbal_yaw - relative_yaw;
+}
+
 #endif // ODOMETRY_KINEMATICS_H
