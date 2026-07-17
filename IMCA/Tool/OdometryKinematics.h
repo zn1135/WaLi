@@ -46,4 +46,12 @@ static inline void Odom_ChassisToGimbal(float vx_chassis,
     *vy_gimbal = vx_chassis * sin_relative_yaw + vy_chassis * cos_relative_yaw;
 }
 
+static inline float Odom_WorldToGimbalForward(float vx_world,
+                                               float vy_world,
+                                               float sin_gimbal_yaw,
+                                               float cos_gimbal_yaw)
+{
+    return -vx_world * sin_gimbal_yaw + vy_world * cos_gimbal_yaw;
+}
+
 #endif // ODOMETRY_KINEMATICS_H

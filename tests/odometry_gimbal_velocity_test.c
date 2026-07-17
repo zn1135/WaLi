@@ -77,6 +77,34 @@ static void ExpectRecoveredGimbalVelocity(const char *case_name,
     AssertNear(case_name, "rotation", decoded.rotation_linear, rotation_linear);
 }
 
+static void ExpectGimbalForwardProjection(const char *case_name,
+                                          float vx_world,
+                                          float vy_world,
+                                          float yaw,
+                                          float expected_forward)
+{
+    const float actual_forward = Odom_WorldToGimbalForward(vx_world,
+                                                            vy_world,
+                                                            sinf(yaw),
+                                                            cosf(yaw));
+    AssertNear(case_name, "forward_velocity", actual_forward, expected_forward);
+}
+
+static void ExpectGimbalForwardIntegration(const char *case_name,
+                                           float forward_velocity,
+                                           int periods,
+                                           float dt,
+                                           float expected_displacement)
+{
+    float displacement = 0.0f;
+    int i;
+    for (i = 0; i < periods; i++)
+    {
+        displacement += forward_velocity * dt;
+    }
+    AssertNear(case_name, "forward_displacement", displacement, expected_displacement);
+}
+
 int main(void)
 {
     ExpectRecoveredGimbalVelocity("aligned", 0.35f, 1.20f, 0.0f, 0.0f);
@@ -85,6 +113,11 @@ int main(void)
     ExpectRecoveredGimbalVelocity("translation_positive_spin", -0.4f, 1.3f, 0.73f, 2.2f);
     ExpectRecoveredGimbalVelocity("translation_negative_spin", 0.6f, -0.8f, -1.17f, -1.8f);
     ExpectRecoveredGimbalVelocity("pure_spin", 0.0f, 0.0f, 1.1f, 2.5f);
+    ExpectGimbalForwardProjection("gimbal_yaw_zero", 0.0f, 1.5f, 0.0f, 1.5f);
+    ExpectGimbalForwardProjection("gimbal_yaw_positive_quarter", 1.5f, 0.0f, TEST_PI / 2.0f, -1.5f);
+    ExpectGimbalForwardProjection("gimbal_yaw_negative_quarter", 1.5f, 0.0f, -TEST_PI / 2.0f, 1.5f);
+    ExpectGimbalForwardProjection("zero_world_velocity", 0.0f, 0.0f, 0.9f, 0.0f);
+    ExpectGimbalForwardIntegration("forward_displacement_over_periods", 1.25f, 80, 0.001f, 0.1f);
 
     if (failures != 0)
     {
