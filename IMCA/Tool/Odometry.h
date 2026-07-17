@@ -20,10 +20,10 @@
 
 typedef struct
 {
-    /* ---- 逆解算结果（底盘机体系，单位 m/s / rad/s）---- */
-    float wheel_vx;     // 机体系横向(左右平移)速度，正负号与 chassis car_vx 一致
-    float wheel_vy;     // 机体系纵向(前后)速度，正负号与 chassis car_vy 一致
-    float wheel_wz;     // 逆解算偏航角速度 rad/s（需正确的 CHASSIS_ROTATE_RADIUS）
+    /* ---- 逆解算轮速（云台坐标系，单位 m/s；wheel_wz 为底盘 rad/s）---- */
+    float wheel_vx;     // 云台横向速度；右向为正（符号由 ODOM_VX_SIGN 标定）
+    float wheel_vy;     // 云台纵向速度；沿云台前向为正（符号由 ODOM_VY_SIGN 标定）
+    float wheel_wz;     // 底盘逆解偏航角速度 rad/s
 
     /* ---- 卡尔曼融合后的速度（世界系，单位 m/s 与 m/s^2）---- */
     float vx_world;

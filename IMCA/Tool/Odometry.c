@@ -3,6 +3,7 @@
 //
 
 #include "Odometry.h"
+#include "OdometryKinematics.h"
 
 #include <math.h>
 #include <string.h>
@@ -143,18 +144,18 @@ void Odometry_Reset(void)
  *   vy = (FL - FR + BL - BR) / 4
  *   vw = -(FR + FL + BR + BL) / 4
  */
-static void Odom_InverseSolve(void)
+static void Odom_InverseSolve(float *vx_chassis, float *vy_chassis)
 {
     // 轮面线速度 m/s（电机转子 rpm -> 轮面 m/s）
-    float fr = xMotorParam[WHEEL_FR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    float fl = xMotorParam[WHEEL_FL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    float br = xMotorParam[WHEEL_BR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    float bl = xMotorParam[WHEEL_BL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
+    const float fr = xMotorParam[WHEEL_FR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
+    const float fl = xMotorParam[WHEEL_FL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
+    const float br = xMotorParam[WHEEL_BR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
+    const float bl = xMotorParam[WHEEL_BL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
+    const OdomMecanumVelocity_t velocity = Odom_DecodeMecanum(fr, fl, br, bl);
 
-    Odom.wheel_vx = ODOM_VX_SIGN * (bl - fl + br - fr) * 0.25f;
-    Odom.wheel_vy = ODOM_VY_SIGN * (fl - fr + bl - br) * 0.25f;
-    // 旋转分量：4 轮速度和 / 4 得到轮面切向速度，再除以旋转半径 -> rad/s
-    Odom.wheel_wz = -(fr + fl + br + bl) * 0.25f / CHASSIS_ROTATE_RADIUS;
+    *vx_chassis = ODOM_VX_SIGN * velocity.vx_chassis;
+    *vy_chassis = ODOM_VY_SIGN * velocity.vy_chassis;
+    Odom.wheel_wz = velocity.rotation_linear / CHASSIS_ROTATE_RADIUS;
 }
 
 /**
@@ -204,15 +205,27 @@ void Odometry_Update(void)
     Odom.yaw_gimbal = yaw_g_abs - s_chassis_yaw0;  // 云台里程计航向
     Odom.yaw_rate = ODOM_YAW_SIGN * IMU_Yaw.speed_gyro * DEG2RAD;
 
-    /* ---------- 2. 逆解算：轮速 -> 机体系速度 ---------- */
-    Odom_InverseSolve();
+    /* ---------- 2. 逆解算：轮速 -> 底盘机体系速度 ---------- */
+    float wheel_vx_chassis;
+    float wheel_vy_chassis;
+    Odom_InverseSolve(&wheel_vx_chassis, &wheel_vy_chassis);
+
+    // 公开轮速使用云台坐标系；该矩阵是小陀螺指令变换的严格逆变换。
+    const float sin_rel = arm_sin_f32(rel);
+    const float cos_rel = arm_cos_f32(rel);
+    Odom_ChassisToGimbal(wheel_vx_chassis,
+                         wheel_vy_chassis,
+                         sin_rel,
+                         cos_rel,
+                         &Odom.wheel_vx,
+                         &Odom.wheel_vy);
 
     /* ---------- 3. 量测旋转到世界系 ---------- */
-    // 轮速(底盘机体系) -> 世界系，用底盘航向
-    float cc = arm_cos_f32(Odom.yaw_chassis);
-    float sc = arm_sin_f32(Odom.yaw_chassis);
-    float vx_w_meas = Odom.wheel_vx * cc - Odom.wheel_vy * sc;
-    float vy_w_meas = Odom.wheel_vx * sc + Odom.wheel_vy * cc;
+    // 世界系融合必须继续使用底盘机体系轮速和底盘航向。
+    const float cc = arm_cos_f32(Odom.yaw_chassis);
+    const float sc = arm_sin_f32(Odom.yaw_chassis);
+    const float vx_w_meas = wheel_vx_chassis * cc - wheel_vy_chassis * sc;
+    const float vy_w_meas = wheel_vx_chassis * sc + wheel_vy_chassis * cc;
 
     // 加速度：四元数去重力，得到 IMU 世界系水平加速度（与云台姿态无关）
     float ax_iw, ay_iw;
