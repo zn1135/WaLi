@@ -40,9 +40,10 @@ typedef struct
     float vy_body;
     float speed;        // 合速度大小 sqrt(vx^2+vy^2)  m/s
 
-    /* ---- 里程计输出：世界系位置（单位 m）---- */
+    /* ---- 里程计输出：世界系位置与云台前向位移（单位 m）---- */
     float pos_x;
     float pos_y;
+    float pos_gimbal_y; // 沿当前云台前向的累计位移
     float total_dist;   // 累计路程 m
 
     /* ---- 航向（单位 rad，以里程计启动时底盘朝向为 0）---- */

@@ -263,7 +263,7 @@ void TotalControl(void)
                     Odom.vx_body,     // 4 左右速度（卡尔曼融合，应贴着 ch3）
                     Odom.acc_body_x,  // 5 左右加速度（去重力, m/s^2）
                     Odom.yaw_chassis, // 6 底盘航向 (rad)
-                    Odom.pos_y);      // 7 前后位置 (m)
+                    Odom.pos_gimbal_y); // 7 云台前后位移 (m)
     // Vofa_Send_Data8(-MiniPC_ReceivePacket.pitch,//0
     //                 xMotorParam[PITCH].MeasureImu->angle, //1
     //                  xMotorParam[PITCH].TempCalc  , //2

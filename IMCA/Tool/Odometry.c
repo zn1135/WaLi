@@ -125,6 +125,7 @@ void Odometry_Reset(void)
 {
     Odom.pos_x = 0.0f;
     Odom.pos_y = 0.0f;
+    Odom.pos_gimbal_y = 0.0f;
     Odom.total_dist = 0.0f;
     Odom.inited = 0; // 下次 Update 时重新锁定起始航向
 }
@@ -264,6 +265,14 @@ void Odometry_Update(void)
     Odom.pos_y += Odom.vy_world * ODOM_DT;
     Odom.speed = sqrtf(Odom.vx_world * Odom.vx_world + Odom.vy_world * Odom.vy_world);
     Odom.total_dist += Odom.speed * ODOM_DT;
+
+    const float cg = arm_cos_f32(Odom.yaw_gimbal);
+    const float sg = arm_sin_f32(Odom.yaw_gimbal);
+    const float vy_gimbal_fused = Odom_WorldToGimbalForward(Odom.vx_world,
+                                                            Odom.vy_world,
+                                                            sg,
+                                                            cg);
+    Odom.pos_gimbal_y += vy_gimbal_fused * ODOM_DT;
 
     // 融合速度反旋转回机体系，便于与轮速直接对比
     Odom.vx_body = Odom.vx_world * cc + Odom.vy_world * sc;
