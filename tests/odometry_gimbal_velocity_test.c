@@ -64,7 +64,7 @@ static void ExpectRecoveredGimbalVelocity(const char *case_name,
                             &br,
                             &bl);
 
-    const OdomMecanumVelocity_t decoded = Odom_DecodeMecanum(fr, fl, br, bl);
+    const OdomMecanumVelocity_t decoded = Odom_DecodeCalibratedMecanum(fr, fl, br, bl);
     Odom_ChassisToGimbal(decoded.vx_chassis,
                          decoded.vy_chassis,
                          sin_rel,

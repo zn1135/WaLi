@@ -94,7 +94,7 @@ static void ExpectRecoveredGimbalVelocity(const char *case_name,
                             &br,
                             &bl);
 
-    const OdomMecanumVelocity_t decoded = Odom_DecodeMecanum(fr, fl, br, bl);
+    const OdomMecanumVelocity_t decoded = Odom_DecodeCalibratedMecanum(fr, fl, br, bl);
     Odom_ChassisToGimbal(decoded.vx_chassis,
                          decoded.vy_chassis,
                          sin_rel,
@@ -161,6 +161,10 @@ Create `IMCA/Tool/OdometryKinematics.h` with this complete content:
 #ifndef ODOMETRY_KINEMATICS_H
 #define ODOMETRY_KINEMATICS_H
 
+// Wheel-feedback signs must match the current Chassis.car_vx/car_vy convention.
+#define ODOM_VX_SIGN (+1.0f)
+#define ODOM_VY_SIGN (+1.0f)
+
 typedef struct
 {
     float vx_chassis;
@@ -177,6 +181,17 @@ static inline OdomMecanumVelocity_t Odom_DecodeMecanum(float fr,
     velocity.vx_chassis = (bl - fl + br - fr) * 0.25f;
     velocity.vy_chassis = (fl - fr + bl - br) * 0.25f;
     velocity.rotation_linear = -(fr + fl + br + bl) * 0.25f;
+    return velocity;
+}
+
+static inline OdomMecanumVelocity_t Odom_DecodeCalibratedMecanum(float fr,
+                                                                  float fl,
+                                                                  float br,
+                                                                  float bl)
+{
+    OdomMecanumVelocity_t velocity = Odom_DecodeMecanum(fr, fl, br, bl);
+    velocity.vx_chassis *= ODOM_VX_SIGN;
+    velocity.vy_chassis *= ODOM_VY_SIGN;
     return velocity;
 }
 
@@ -260,10 +275,10 @@ static void Odom_InverseSolve(float *vx_chassis, float *vy_chassis)
     const float fl = xMotorParam[WHEEL_FL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
     const float br = xMotorParam[WHEEL_BR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
     const float bl = xMotorParam[WHEEL_BL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    const OdomMecanumVelocity_t velocity = Odom_DecodeMecanum(fr, fl, br, bl);
+    const OdomMecanumVelocity_t velocity = Odom_DecodeCalibratedMecanum(fr, fl, br, bl);
 
-    *vx_chassis = ODOM_VX_SIGN * velocity.vx_chassis;
-    *vy_chassis = ODOM_VY_SIGN * velocity.vy_chassis;
+    *vx_chassis = velocity.vx_chassis;
+    *vy_chassis = velocity.vy_chassis;
     Odom.wheel_wz = velocity.rotation_linear / CHASSIS_ROTATE_RADIUS;
 }
 ```

@@ -42,9 +42,7 @@
 // 加速度世界系与里程计世界系的航向对齐微调(rad)，一般 0；若推车方向与轮速对不上再调。
 #define ODOM_ACC_YAW_OFFSET 0.0f
 
-// —— 符号校准位（推车观察 Vofa：前进时 vy_body>0、右移时 vx_body>0 即正确，否则翻转）——
-#define ODOM_VX_SIGN    (+1.0f)   // 逆解算横向速度正方向（右移为正则不变）
-#define ODOM_VY_SIGN    (-1.0f)   // 逆解算纵向速度正方向（标定：前进时为负 -> 翻成 -1）
+// —— 航向/相对角符号校准位 ——
 #define ODOM_YAW_SIGN   (+1.0f)   // IMU 航向角正方向
 #define ODOM_REL_SIGN   (+1.0f)   // 云台-底盘相对角正方向
 
@@ -151,10 +149,10 @@ static void Odom_InverseSolve(float *vx_chassis, float *vy_chassis)
     const float fl = xMotorParam[WHEEL_FL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
     const float br = xMotorParam[WHEEL_BR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
     const float bl = xMotorParam[WHEEL_BL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    const OdomMecanumVelocity_t velocity = Odom_DecodeMecanum(fr, fl, br, bl);
+    const OdomMecanumVelocity_t velocity = Odom_DecodeCalibratedMecanum(fr, fl, br, bl);
 
-    *vx_chassis = ODOM_VX_SIGN * velocity.vx_chassis;
-    *vy_chassis = ODOM_VY_SIGN * velocity.vy_chassis;
+    *vx_chassis = velocity.vx_chassis;
+    *vy_chassis = velocity.vy_chassis;
     Odom.wheel_wz = velocity.rotation_linear / CHASSIS_ROTATE_RADIUS;
 }
 

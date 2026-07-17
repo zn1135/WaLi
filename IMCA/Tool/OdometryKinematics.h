@@ -1,6 +1,10 @@
 #ifndef ODOMETRY_KINEMATICS_H
 #define ODOMETRY_KINEMATICS_H
 
+// Wheel-feedback signs must match the current Chassis.car_vx/car_vy convention.
+#define ODOM_VX_SIGN (+1.0f)
+#define ODOM_VY_SIGN (+1.0f)
+
 typedef struct
 {
     float vx_chassis;
@@ -17,6 +21,17 @@ static inline OdomMecanumVelocity_t Odom_DecodeMecanum(float fr,
     velocity.vx_chassis = (bl - fl + br - fr) * 0.25f;
     velocity.vy_chassis = (fl - fr + bl - br) * 0.25f;
     velocity.rotation_linear = -(fr + fl + br + bl) * 0.25f;
+    return velocity;
+}
+
+static inline OdomMecanumVelocity_t Odom_DecodeCalibratedMecanum(float fr,
+                                                                  float fl,
+                                                                  float br,
+                                                                  float bl)
+{
+    OdomMecanumVelocity_t velocity = Odom_DecodeMecanum(fr, fl, br, bl);
+    velocity.vx_chassis *= ODOM_VX_SIGN;
+    velocity.vy_chassis *= ODOM_VY_SIGN;
     return velocity;
 }
 
