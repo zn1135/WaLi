@@ -54,4 +54,21 @@ static inline float Odom_WorldToGimbalForward(float vx_world,
     return -vx_world * sin_gimbal_yaw + vy_world * cos_gimbal_yaw;
 }
 
+static inline float Odom_WorldToGimbalForwardFromChassis(float vx_world,
+                                                          float vy_world,
+                                                          float sin_chassis_yaw,
+                                                          float cos_chassis_yaw,
+                                                          float sin_relative_yaw,
+                                                          float cos_relative_yaw)
+{
+    const float sin_gimbal_yaw = sin_chassis_yaw * cos_relative_yaw +
+                                 cos_chassis_yaw * sin_relative_yaw;
+    const float cos_gimbal_yaw = cos_chassis_yaw * cos_relative_yaw -
+                                 sin_chassis_yaw * sin_relative_yaw;
+    return Odom_WorldToGimbalForward(vx_world,
+                                     vy_world,
+                                     sin_gimbal_yaw,
+                                     cos_gimbal_yaw);
+}
+
 #endif // ODOMETRY_KINEMATICS_H

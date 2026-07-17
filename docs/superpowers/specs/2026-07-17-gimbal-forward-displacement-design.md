@@ -12,15 +12,17 @@
 
 ## 计算方式
 
-卡尔曼融合得到世界系速度后，使用相对里程计世界系的云台航向 `Odom.yaw_gimbal` 投影出当前云台前向速度：
+卡尔曼融合得到世界系速度后，使用底盘里程计航向与电机相对角计算云台世界航向，再投影出当前云台前向速度。相对角使用 `xMotorParam[YAW].MeasureDM->position - Gimbal_FrontAngle`（单位为度，计算时转换为弧度）：
 
 ```c
-v_gimbal_y = -Odom.vx_world * sin(Odom.yaw_gimbal)
-            + Odom.vy_world * cos(Odom.yaw_gimbal);
+relative_yaw = (xMotorParam[YAW].MeasureDM->position - Gimbal_FrontAngle) * PI / 180;
+gimbal_yaw = Odom.yaw_chassis + relative_yaw;
+v_gimbal_y = -Odom.vx_world * sin(gimbal_yaw)
+            + Odom.vy_world * cos(gimbal_yaw);
 Odom.pos_gimbal_y += v_gimbal_y * ODOM_DT;
 ```
 
-`Odom.yaw_gimbal` 已以里程计启动时的底盘朝向为零，因此与 `pos_x/pos_y` 使用同一个世界系。位移积分使用融合速度而不是原始加速度或未经融合的轮速，保持现有滤波策略。
+`Odom.yaw_chassis` 已以里程计启动时的底盘朝向为零，加上云台相对角即可得到与 `pos_x/pos_y` 同一世界系的云台航向。位移积分使用融合速度而不是原始加速度或未经融合的轮速，保持现有滤波策略。
 
 该定义是“沿每个时刻云台前向的速度积分”。云台在运动过程中改变朝向时，它表示前向路径分量的积分；小陀螺中云台通常保持朝向不变，此时等价于世界位移在云台前向轴上的投影。
 

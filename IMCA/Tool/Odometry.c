@@ -266,12 +266,16 @@ void Odometry_Update(void)
     Odom.speed = sqrtf(Odom.vx_world * Odom.vx_world + Odom.vy_world * Odom.vy_world);
     Odom.total_dist += Odom.speed * ODOM_DT;
 
-    const float cg = arm_cos_f32(Odom.yaw_gimbal);
-    const float sg = arm_sin_f32(Odom.yaw_gimbal);
-    const float vy_gimbal_fused = Odom_WorldToGimbalForward(Odom.vx_world,
-                                                            Odom.vy_world,
-                                                            sg,
-                                                            cg);
+    const float relative_yaw = (xMotorParam[YAW].MeasureDM->position -
+                                Gimbal_FrontAngle) * DEG2RAD;
+    const float cr = arm_cos_f32(relative_yaw);
+    const float sr = arm_sin_f32(relative_yaw);
+    const float vy_gimbal_fused = Odom_WorldToGimbalForwardFromChassis(Odom.vx_world,
+                                                                        Odom.vy_world,
+                                                                        sc,
+                                                                        cc,
+                                                                        sr,
+                                                                        cr);
     Odom.pos_gimbal_y += vy_gimbal_fused * ODOM_DT;
 
     // 融合速度反旋转回机体系，便于与轮速直接对比
