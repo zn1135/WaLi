@@ -150,6 +150,8 @@ virtualFolder:
         - path: ../IMCA/Tool/INS_task.h
         - path: ../IMCA/Tool/kalman_filter.c
         - path: ../IMCA/Tool/kalman_filter.h
+        - path: ../IMCA/Tool/Odometry.c
+        - path: ../IMCA/Tool/Odometry.h
         - path: ../IMCA/Tool/Motor.c
         - path: ../IMCA/Tool/Motor.h
         - path: ../IMCA/Tool/pid.c
