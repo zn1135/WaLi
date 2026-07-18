@@ -940,16 +940,6 @@
               <FilePath>..\IMCA\Tool\Ramp.c</FilePath>
             </File>
             <File>
-              <FileName>VBatSense.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\IMCA\Tool\VBatSense.c</FilePath>
-            </File>
-            <File>
-              <FileName>VBatSense.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\IMCA\Tool\VBatSense.h</FilePath>
-            </File>
-            <File>
               <FileName>Vision_interact.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\IMCA\Tool\Vision_interact.c</FilePath>
