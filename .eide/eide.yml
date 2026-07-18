@@ -150,6 +150,8 @@ virtualFolder:
         - path: IMCA/Tool/INS_task.h
         - path: IMCA/Tool/kalman_filter.c
         - path: IMCA/Tool/kalman_filter.h
+        - path: IMCA/Tool/Odometry.c
+        - path: IMCA/Tool/Odometry.h
         - path: IMCA/Tool/Motor.c
         - path: IMCA/Tool/Motor.h
         - path: IMCA/Tool/pid.c
@@ -158,14 +160,14 @@ virtualFolder:
         - path: IMCA/Tool/PowerLimit.h
         - path: IMCA/Tool/Ramp.h
         - path: IMCA/Tool/Ramp.c
+        - path: IMCA/Tool/VBatSense.c
+        - path: IMCA/Tool/VBatSense.h
         - path: IMCA/Tool/Vision_interact.c
         - path: IMCA/Tool/Vision_interact.h
         - path: IMCA/Tool/Vofa_send.c
         - path: IMCA/Tool/Vofa_send.h
         - path: IMCA/User/user_lib.c
         - path: IMCA/User/user_lib.h
-        - path: IMCA/Tool/Odometry.c
-        - path: IMCA/Tool/Odometry.h
       folders: []
     - name: ::CMSIS
       files: []
@@ -201,8 +203,7 @@ targets:
         - .cmsis/include
         - MDK-ARM/RTE/_G474_Example
       libList: []
-    excludeList:
-      - <virtual_root>/IMCA/VBatSense.c
+    excludeList: []
     settings:
       debugger: cortex-debug
     toolchain: AC5

@@ -15,7 +15,7 @@
 #include "math.h"
 #include "usbd_cdc_if.h"
 #include "user_lib.h"
-
+#include "Odometry.h"
 bool MyColor;
 
 uint8_t MiniPC_SendBuf[MINIPC_SENDLENGTH];
@@ -68,6 +68,9 @@ void MiniPC_SendVisionFrameInfo(MiniPC_SendPacket_Typedef *SendPacket)
     MiniPC_SendPacket.yaw_vel = IMU_Yaw.speed_gyro;
     //	MiniPC_SendPacket.yaw = xMotorParam[YAW].MeasureDM->position;
     //	MiniPC_SendPacket.pitch = xMotorParam[PITCH].MeasureDM->position;
+    MiniPC_SendPacket.x=WheelOdom.pos_y_nav;
+    MiniPC_SendPacket.y=WheelOdom.pos_x_nav;
+    MiniPC_SendPacket.z=0;
     MiniPC_SendPacket.pitch = IMU_Pitch.angle * PI / 180; // xMotorParam[PITCH].MeasureImu->angle *PI/180;//IMU_Look[1];
     MiniPC_SendPacket.my_color = !RoboColor();            // send rival's color
     memcpy(MiniPC_SendBuf, (uint8_t *)SendPacket, MINIPC_SENDLENGTH);

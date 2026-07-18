@@ -890,6 +890,16 @@
               <FilePath>..\IMCA\Tool\kalman_filter.h</FilePath>
             </File>
             <File>
+              <FileName>Odometry.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\IMCA\Tool\Odometry.c</FilePath>
+            </File>
+            <File>
+              <FileName>Odometry.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\IMCA\Tool\Odometry.h</FilePath>
+            </File>
+            <File>
               <FileName>Motor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\IMCA\Tool\Motor.c</FilePath>

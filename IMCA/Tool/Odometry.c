@@ -1,265 +1,239 @@
-//
-// Created by Claude on 25-5-30.
-//
-
 #include "Odometry.h"
 
-#include <math.h>
-#include <string.h>
+#include "OdometryKinematics.h"
 
-#include "arm_math.h"
-#include "kalman_filter.h"   // vaEstimateKF, Kalman_Filter_*
-#include "Motor.h"           // xMotorParam[]
-#include "user_lib.h"        // WHEEL_* 枚举, RPM_To_Rads, Reduction_Ratio, CHASSIS_WHEEL_RADIUS, PI, xRelativeAngle
-#include "IMU_Task.h"        // IMU_Yaw
-#include "imu_data_decode.h" // receive_imusol
-
-/* ===================== 可调参数（上车后用 Vofa 标定）===================== */
-
-#define ODOM_DT 0.001f      // 控制周期：CtrlTask 中 osDelay(1) => 1ms
-#define ODOM_G 9.80665f     // 重力加速度，IMU acc[] 单位为 g，需转 m/s^2
-#define DEG2RAD (PI / 180.0f)
-
-// rotor rpm -> 轮面线速度 m/s ：rpm * (rad/s per rpm) / 减速比 * 轮半径
-#define WHEEL_RPM_TO_MPS (RPM_To_Rads / Reduction_Ratio * CHASSIS_WHEEL_RADIUS)
-
-// 底盘旋转半径 (lx+ly)，用于把逆解算的旋转分量换算成 rad/s。请实测后修改！
-#define CHASSIS_ROTATE_RADIUS 0.2f
-
-// 陀螺仪是否安装在云台上(随云台一起转)。1=云台(默认,小陀螺时云台不转) 0=底盘
-#define ODOM_IMU_ON_GIMBAL 1
-
-// —— 四元数去重力（IMU 在云台上、随云台 pitch/yaw，必须用姿态去掉重力分量）——
-// quat 元素顺序：HiPNUC IMUSOL 包为 [w,x,y,z]。固件不同就改下标。
-#define ODOM_QUAT_W 0
-#define ODOM_QUAT_X 1
-#define ODOM_QUAT_Y 2
-#define ODOM_QUAT_Z 3
-// quat 默认表示 body->world 旋转。若标定发现“静止时俯仰云台，acc_body 不为 0”，
-// 把这里置 1（取共轭，按 world->body 处理）。
-#define ODOM_QUAT_CONJ 0
-// 加速度世界系与里程计世界系的航向对齐微调(rad)，一般 0；若推车方向与轮速对不上再调。
-#define ODOM_ACC_YAW_OFFSET 0.0f
-
-// —— 符号校准位（推车观察 Vofa：前进时 vy_body>0、右移时 vx_body>0 即正确，否则翻转）——
-#define ODOM_VX_SIGN    (+1.0f)   // 逆解算横向速度正方向（右移为正则不变）
-#define ODOM_VY_SIGN    (-1.0f)   // 逆解算纵向速度正方向（标定：前进时为负 -> 翻成 -1）
-#define ODOM_YAW_SIGN   (+1.0f)   // IMU 航向角正方向
-#define ODOM_REL_SIGN   (+1.0f)   // 云台-底盘相对角正方向
-
-// —— 卡尔曼噪声（相对大小决定信轮速还是信加速度，按需微调）——
-#define ODOM_R_VEL  0.25f   // 轮速量测噪声方差（越大越不信轮速，抗打滑↑但滞后↑）
-#define ODOM_R_ACC  1.50f   // 加速度量测噪声方差
-#define ODOM_Q_VEL  0.005f  // 速度过程噪声
-#define ODOM_Q_ACC  8.0f    // 加速度过程噪声（accel 变化快，给大一点）
-#define ODOM_P_INIT 1.0f    // 初始协方差
-
-/* ======================================================================= */
-
-Odometry_t Odom;
-KalmanFilter_t vaEstimateKF; // 满足 kalman_filter.h 中的 extern 声明
-
-static float s_chassis_yaw0; // 起始底盘绝对航向(rad)，作为里程计世界系 0 航向
-static uint8_t s_kf_ok = 0;  // KF 关键矩阵是否分配成功（堆不足时为 0，走兜底）
-
-/**
- * @brief  初始化 4 状态 va 卡尔曼滤波器
- *         x = [vx_w, vy_w, ax_w, ay_w]^T   (世界系)
- *         z = [vx_wheel, vy_wheel, ax_imu, ay_imu]^T
- *         匀加速模型： v(k) = v(k-1) + a*dt
- */
-static void Odom_KF_Init(void)
-{
-    Kalman_Filter_Init(&vaEstimateKF, 4, 0, 4);
-    vaEstimateKF.UseAutoAdjustment = 0; // 每周期轮速与加速度都有效，不做动态调整
-
-    static const float F_Init[16] = {
-        1, 0, ODOM_DT, 0,
-        0, 1, 0, ODOM_DT,
-        0, 0, 1, 0,
-        0, 0, 0, 1};
-    static const float P_Init[16] = {
-        ODOM_P_INIT, 0, 0, 0,
-        0, ODOM_P_INIT, 0, 0,
-        0, 0, ODOM_P_INIT, 0,
-        0, 0, 0, ODOM_P_INIT};
-    static const float Q_Init[16] = {
-        ODOM_Q_VEL, 0, 0, 0,
-        0, ODOM_Q_VEL, 0, 0,
-        0, 0, ODOM_Q_ACC, 0,
-        0, 0, 0, ODOM_Q_ACC};
-    static const float R_Init[16] = {
-        ODOM_R_VEL, 0, 0, 0,
-        0, ODOM_R_VEL, 0, 0,
-        0, 0, ODOM_R_ACC, 0,
-        0, 0, 0, ODOM_R_ACC};
-    // UseAutoAdjustment=0 时需手动给定 H（这里量测与状态一一对应，取单位阵）
-    static const float H_Init[16] = {
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1};
-    static const float StateMinVar[4] = {0.001f, 0.001f, 0.01f, 0.01f};
-
-    memcpy(vaEstimateKF.F_data, F_Init, sizeof(F_Init));
-    memcpy(vaEstimateKF.P_data, P_Init, sizeof(P_Init));
-    memcpy(vaEstimateKF.Q_data, Q_Init, sizeof(Q_Init));
-    memcpy(vaEstimateKF.R_data, R_Init, sizeof(R_Init));
-    memcpy(vaEstimateKF.H_data, H_Init, sizeof(H_Init));
-    memcpy(vaEstimateKF.StateMinVariance, StateMinVar, sizeof(StateMinVar));
-
-    // 校验关键矩阵（尤其算增益用的 K/S/temp）确实分配成功；任一为 NULL 说明堆不足，
-    // 滤波会静默失效(增益恒0、速度冻结)，此时置 0 走兜底，不再信任 KF 输出。
-    s_kf_ok = (vaEstimateKF.K_data != NULL && vaEstimateKF.S_data != NULL &&
-               vaEstimateKF.temp_matrix_data != NULL && vaEstimateKF.temp_matrix_data1 != NULL &&
-               vaEstimateKF.FilteredValue != NULL);
-}
-
-void Odometry_Init(void)
-{
-    memset(&Odom, 0, sizeof(Odom));
-    s_chassis_yaw0 = 0.0f;
-    Odom_KF_Init();
-}
-
-void Odometry_Reset(void)
-{
-    Odom.pos_x = 0.0f;
-    Odom.pos_y = 0.0f;
-    Odom.total_dist = 0.0f;
-    Odom.inited = 0; // 下次 Update 时重新锁定起始航向
-}
-
-/**
- * @brief  麦轮逆解算：四轮转速(rpm) -> 底盘机体系速度(m/s, rad/s)
- *
- * 正解算(ChassisControl_Calculating)使用的关系：
- *   FR = -(vx + vy + vw)
- *   FL = -vx + vy - vw
- *   BR =  vx - vy - vw
- *   BL =  vx + vy - vw
- * 对其求逆得到（取冗余项平均，抗单轮噪声/打滑）：
- *   vx = (BL - FL + BR - FR) / 4
- *   vy = (FL - FR + BL - BR) / 4
- *   vw = -(FR + FL + BR + BL) / 4
- */
-static void Odom_InverseSolve(void)
-{
-    // 轮面线速度 m/s（电机转子 rpm -> 轮面 m/s）
-    float fr = xMotorParam[WHEEL_FR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    float fl = xMotorParam[WHEEL_FL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    float br = xMotorParam[WHEEL_BR].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-    float bl = xMotorParam[WHEEL_BL].MeasureEco->speed_rpm * WHEEL_RPM_TO_MPS;
-
-    Odom.wheel_vx = ODOM_VX_SIGN * (bl - fl + br - fr) * 0.25f;
-    Odom.wheel_vy = ODOM_VY_SIGN * (fl - fr + bl - br) * 0.25f;
-    // 旋转分量：4 轮速度和 / 4 得到轮面切向速度，再除以旋转半径 -> rad/s
-    Odom.wheel_wz = -(fr + fl + br + bl) * 0.25f / CHASSIS_ROTATE_RADIUS;
-}
-
-/**
- * @brief  四元数去重力：把 IMU 机体加速度(含重力, 单位 g) 旋转到 IMU 世界系，
- *         重力整体落在世界系 Z 轴，因此输出的水平 X/Y 分量自动不含重力，
- *         且与云台 pitch/roll/yaw 姿态无关（姿态全部由四元数吸收）。
- * @param  ax_iw [out] IMU 世界系 X 向水平加速度 (m/s^2)
- * @param  ay_iw [out] IMU 世界系 Y 向水平加速度 (m/s^2)
- */
-static void Odom_AccToWorldHorizontal(float *ax_iw, float *ay_iw)
-{
-    float w = receive_imusol.quat[ODOM_QUAT_W];
-    float x = receive_imusol.quat[ODOM_QUAT_X];
-    float y = receive_imusol.quat[ODOM_QUAT_Y];
-    float z = receive_imusol.quat[ODOM_QUAT_Z];
-#if ODOM_QUAT_CONJ
-    x = -x;
-    y = -y;
-    z = -z; // 取共轭：按 world->body 处理
+#ifndef ODOMETRY_HOST_TEST
+#include "Motor.h"
+#include "imu_data_decode.h"
+#include "user_lib.h"
 #endif
-    // 机体系加速度 (m/s^2)，含重力
-    float bx = receive_imusol.acc[0] * ODOM_G;
-    float by = receive_imusol.acc[1] * ODOM_G;
-    float bz = receive_imusol.acc[2] * ODOM_G;
-    // 旋转矩阵 R(body->world) 的前两行（世界系 X、Y；第三行=Z 含重力，不需要）
-    *ax_iw = (1.0f - 2.0f * (y * y + z * z)) * bx + (2.0f * (x * y - w * z)) * by + (2.0f * (x * z + w * y)) * bz;
-    *ay_iw = (2.0f * (x * y + w * z)) * bx + (1.0f - 2.0f * (x * x + z * z)) * by + (2.0f * (y * z - w * x)) * bz;
+
+// ================= 可调常量：上车只改这里 =================
+// rpm -> m/s 换算： (1/减速比) * (rpm->rad/s) * 轮半径
+// Reduction_Ratio=14, RPM_To_Rads=0.104666667, CHASSIS_WHEEL_RADIUS=0.07
+#define WHEEL_ODOM_SCALE (1.0f / 14.2f * 0.104666667f * 0.0775f)
+
+// 四轮转速符号映射(电机安装方向)。上车若某轮反了，翻对应符号。
+#define WHEEL_SIGN_FR (+1.0f)
+#define WHEEL_SIGN_FL (+1.0f)
+#define WHEEL_SIGN_BR (+1.0f)
+#define WHEEL_SIGN_BL (+1.0f)
+
+// 底盘绝对航向符号： chassis_yaw = gimbal_yaw - CHASSIS_YAW_REL_SIGN * relative
+#define CHASSIS_YAW_REL_SIGN (+1.0f)
+
+// 航向同源化：vw_body(rpm尺度)-> ωz(rad/s)。修小陀螺速度用。
+// 起算 = WHEEL_ODOM_SCALE/(lx+ly)，lx+ly=半轴距+半轮距(m)。这里取 0.3 估值。
+// 不准只影响暂态跟踪，低频纠偏保证稳态回到 chassis_yaw_cont。上车调这里。
+#define ODOM_VW_TO_RADPS (WHEEL_ODOM_SCALE / 0.25f)
+// 航向纠偏时间常数(s)：越大越信 vw 高频、暂态越同步；越小越快锚回绝对航向。
+// chassis_yaw(ch6)已验证正确追踪自转，可以安全做低频锚。
+#define ODOM_HEAD_TAU (0.5f)
+
+#define ODOM_PI  (3.14159265358979f)
+#define ODOM_2PI (6.28318530717959f)
+
+// 四元数分量顺序 [w,x,y,z]
+#define ODOM_QW 0U
+#define ODOM_QX 1U
+#define ODOM_QY 2U
+#define ODOM_QZ 3U
+
+// 重力去除：低通估计法(不依赖四元数约定)。
+// 对传感器系加速度做低通得到"当前重力向量"，原始减低通=真实线性加速度。
+// ALPHA = dt/(tau+dt)，控制周期约 1ms、时间常数 tau≈1s => ALPHA≈0.001。
+// 越小越干净但收敛越慢，越大越跟手但会吃掉持续加速度。上车可调。
+#define ODOM_GRAVITY_LPF_ALPHA (0.001f)
+// 低通收敛判据：连续样本数达到后才认为重力估计可用。
+#define ODOM_GRAVITY_WARMUP (2000U)
+
+// 加速度计传感器轴符号(IMU 安装方向)。默认全 +1。
+#define ODOM_IMU_ACC_SIGN_X (+1.0f)
+#define ODOM_IMU_ACC_SIGN_Y (+1.0f)
+#define ODOM_IMU_ACC_SIGN_Z (+1.0f)
+
+// 加速度输出平滑低通截止(Hz 量级)。alpha越大截止越高、响应越快但噪声越大；
+// 越小越干净但会模糊短促冲击。15Hz 起步，看不清就往上调。
+// alpha ≈ dt/(1/(2π×fc)+dt)，1kHz 控制周期 fc=15Hz → α≈0.086
+#define ODOM_ACCEL_SMOOTH_ALPHA (0.086f)
+
+// 二阶卡尔曼调参（上车只改这里）
+// Q_p 越大位置越灵活，Q_v 越大越信 IMU 加速度，R_v 越大越信轮速
+#define ODOM_KF_Q_P  (0.0f)    // 位置过程噪声：位置只靠速度积分演化，无独立噪声
+                                // 若加非零值会使 P00 快速发散(位置从未被直接观测)
+#define ODOM_KF_Q_V  (1e-3f)   // 速度过程噪声方差
+#define ODOM_KF_R_V  (1e-2f)   // 轮速测速噪声方差 (~0.1 m/s 标准差)
+#define ODOM_KF_Q_V  (1e-3f)   // 速度过程噪声方差
+#define ODOM_KF_R_V  (1e-2f)   // 轮速测速噪声方差 (~0.1 m/s 标准差)
+#define ODOM_KF_P0_P (0.0f)    // 初始位置协方差：开机位置由用户定义为0，初始不确定度为0
+#define ODOM_KF_P0_V (0.1f)    // 初始速度协方差
+#define ODOM_FUSION_DT  (0.001f)  // CtrlTask 1kHz 固定周期
+
+// 加速度旋转四元数共轭开关。重力已由 LPF 在传感器系去除，
+// 此开关只影响线加速度的世界系方向，不会漏重力，可放心翻。
+// =0 原始方向，=1 共轭。推车看 ch1/ch3 与 ch0/ch2 方向是否一致，不一致则翻。
+#define ODOM_ACCEL_QUAT_CONJUGATE 0
+// ========================================================
+
+WheelOdom_t WheelOdom;
+
+void WheelOdom_Init(void)
+{
+    for (unsigned i = 0; i < sizeof(WheelOdom); ++i)
+    {
+        ((unsigned char *)&WheelOdom)[i] = 0;
+    }
 }
 
-void Odometry_Update(void)
+#ifndef ODOMETRY_HOST_TEST
+void WheelOdom_Update(float gimbal_relative_rad)
 {
-    /* ---------- 1. 航向（世界系，以起始为 0） ---------- */
-    float yaw_g_abs = ODOM_YAW_SIGN * IMU_Yaw.total_angle * DEG2RAD; // 云台绝对航向
-#if ODOM_IMU_ON_GIMBAL
-    float rel = ODOM_REL_SIGN * xRelativeAngle.receive_yaw_relative_rad; // 云台相对底盘
+    // ---- 轮速链：4 轮 rpm -> 车体系速度(m/s) ----
+    const float fr = WHEEL_SIGN_FR * (float)xMotorParam[WHEEL_FR].MeasureEco->speed_rpm;
+    const float fl = WHEEL_SIGN_FL * (float)xMotorParam[WHEEL_FL].MeasureEco->speed_rpm;
+    const float br = WHEEL_SIGN_BR * (float)xMotorParam[WHEEL_BR].MeasureEco->speed_rpm;
+    const float bl = WHEEL_SIGN_BL * (float)xMotorParam[WHEEL_BL].MeasureEco->speed_rpm;
+
+    float vx_body, vy_body, vw_body;
+    Odom_WheelForwardKinematics(fr, fl, br, bl, &vx_body, &vy_body, &vw_body);
+    vx_body *= WHEEL_ODOM_SCALE;
+    vy_body *= WHEEL_ODOM_SCALE;
+    WheelOdom.wheel_vx_body = vx_body;
+    WheelOdom.wheel_vy_body = vy_body;
+    // 车体系速度模长(旋转不变量)。边转边匀速走时应恒定；
+    // 若它平 → 轮速没问题、摆动是航向跟踪(可修)；若它也摆 → 轮子打滑(物理)。
+    WheelOdom.wheel_speed_body = sqrtf(vx_body * vx_body + vy_body * vy_body);
+
+    // ---- 云台系速度：纯运动学，车体系速度绕相对角旋转到云台朝向 ----
+    // 与四元数/yaw_valid 无关，放在四元数分支之前，云台角无效时也照常输出。
+    Odom_WheelBodyToGimbal(vx_body, vy_body, gimbal_relative_rad,
+                           &WheelOdom.wheel_vx_gimbal, &WheelOdom.wheel_vy_gimbal);
+
+    // ---- 四元数：取云台航向，算底盘绝对航向 ----
+    float q[4];
+    q[0] = receive_imusol.quat[ODOM_QW];
+    q[1] = receive_imusol.quat[ODOM_QX];
+    q[2] = receive_imusol.quat[ODOM_QY];
+    q[3] = receive_imusol.quat[ODOM_QZ];
+
+    WheelOdom.imu_valid = Odom_NormalizeQuaternion(q) ? 1U : 0U;
+    if (!WheelOdom.imu_valid)
+    {
+        WheelOdom.yaw_valid = 0U;
+        return;
+    }
+
+    float gimbal_yaw;
+    WheelOdom.yaw_valid = Odom_QuaternionToYaw(q, &gimbal_yaw) ? 1U : 0U;
+    if (WheelOdom.yaw_valid)
+    {
+        WheelOdom.dbg_gimbal_yaw = gimbal_yaw;              // 调试
+        WheelOdom.dbg_gimbal_rel = gimbal_relative_rad;    // 调试
+        WheelOdom.chassis_yaw = gimbal_yaw - CHASSIS_YAW_REL_SIGN * gimbal_relative_rad;
+
+        // 连续航向(unwrap)：累加逐周期增量，增量 wrap 到 [-π,π]。
+        // 1kHz 下真实转角远小于 π，故增量归一化能安全跨越回绕跳变。
+        if (!WheelOdom.yaw_cont_init)
+        {
+            WheelOdom.chassis_yaw_cont = WheelOdom.chassis_yaw;
+            WheelOdom.head_sync = WheelOdom.chassis_yaw; // 首帧对齐到绝对航向
+            WheelOdom.yaw_cont_init = 1U;
+        }
+        else
+        {
+            float d = WheelOdom.chassis_yaw - WheelOdom.chassis_yaw_prev;
+            while (d > ODOM_PI)  { d -= ODOM_2PI; }
+            while (d < -ODOM_PI) { d += ODOM_2PI; }
+            WheelOdom.chassis_yaw_cont += d;
+
+            // ---- 同源航向 head_sync：vw 高频积分(与 v_body 同源零延迟) + 低频纠偏 ----
+            // 修小陀螺速度：v_body 与它用的航向同时刻同源，消除 ω·Δ 误差。
+            const float wz = vw_body * ODOM_VW_TO_RADPS; // rad/s，同源
+            WheelOdom.head_sync += wz * ODOM_FUSION_DT;  // 高频积分
+            float e = WheelOdom.chassis_yaw_cont - WheelOdom.head_sync;
+            while (e > ODOM_PI)  { e -= ODOM_2PI; }
+            while (e < -ODOM_PI) { e += ODOM_2PI; }
+            const float kh = ODOM_FUSION_DT / (ODOM_HEAD_TAU + ODOM_FUSION_DT);
+            WheelOdom.head_sync += kh * e;               // 低频纠偏(不漂)
+        }
+        WheelOdom.chassis_yaw_prev = WheelOdom.chassis_yaw;
+
+        // 轮速车体系速度 -> 世界系 E。直接用 chassis_yaw_cont。
+        // head_sync(vw积分+慢纠偏TAU=0.5s)在小陀螺高转速时会有>1rad航向滞后，造成世界速度摆动。
+        // chassis_yaw_cont 由 (gimbal_yaw - relative) 每周期直接算出，无积分漂移，无滞后。
+        Odom_WheelBodyToNav(vx_body, vy_body, WheelOdom.chassis_yaw_cont,
+                            &WheelOdom.wheel_vx_nav, &WheelOdom.wheel_vy_nav);
+    }
+
+    // ---- IMU 链：LPF 估计传感器系重力 → 相减得线加速度 → 四元数转世界系 ----
+    // 不依赖四元数做去重力，云台任意姿态下均无重力泄漏。
+    float acc_s[3];
+    acc_s[0] = receive_imusol.acc[0] * ODOM_KIN_G * ODOM_IMU_ACC_SIGN_X;
+    acc_s[1] = receive_imusol.acc[1] * ODOM_KIN_G * ODOM_IMU_ACC_SIGN_Y;
+    acc_s[2] = receive_imusol.acc[2] * ODOM_KIN_G * ODOM_IMU_ACC_SIGN_Z;
+
+    // 低通更新（在传感器系估计重力）
+    for (int i = 0; i < 3; ++i)
+    {
+        WheelOdom.gravity_lpf[i] = (1.0f - ODOM_GRAVITY_LPF_ALPHA) * WheelOdom.gravity_lpf[i]
+                                   + ODOM_GRAVITY_LPF_ALPHA * acc_s[i];
+    }
+    static uint32_t warmup_cnt;
+    if (warmup_cnt < ODOM_GRAVITY_WARMUP) { ++warmup_cnt; }
+    WheelOdom.gravity_ready = (warmup_cnt >= ODOM_GRAVITY_WARMUP) ? 1U : 0U;
+
+    // 线加速度 = 原始 - 低通重力（传感器系）
+    float a_linear[3];
+    a_linear[0] = acc_s[0] - WheelOdom.gravity_lpf[0];
+    a_linear[1] = acc_s[1] - WheelOdom.gravity_lpf[1];
+    a_linear[2] = acc_s[2] - WheelOdom.gravity_lpf[2];
+
+    // 四元数仅用于"方向旋转"，重力已去除，共轭翻错只影响方向，不漏重力。
+    // ODOM_ACCEL_QUAT_CONJUGATE=0：原始方向；=1：共轭（若方向反了在这里调）
+    float q_rot[4] = {q[0], q[1], q[2], q[3]};
+#if ODOM_ACCEL_QUAT_CONJUGATE
+    q_rot[1] = -q_rot[1]; q_rot[2] = -q_rot[2]; q_rot[3] = -q_rot[3];
+#endif
+    float a_nav[3];
+    Odom_RotateSensorToNav(q_rot, a_linear, a_nav);
+    // 输出一阶低通平滑(旧值即滤波状态)，压掉加速度计高频噪声
+    WheelOdom.imu_ax_nav = (1.0f - ODOM_ACCEL_SMOOTH_ALPHA) * WheelOdom.imu_ax_nav
+                           + ODOM_ACCEL_SMOOTH_ALPHA * a_nav[0];
+    WheelOdom.imu_ay_nav = (1.0f - ODOM_ACCEL_SMOOTH_ALPHA) * WheelOdom.imu_ay_nav
+                           + ODOM_ACCEL_SMOOTH_ALPHA * a_nav[1];
+
+    // ---- 二阶卡尔曼融合：IMU 加速度预测 + 轮速观测，输出位置+速度 ----
+    if (!WheelOdom.yaw_valid)
+    {
+        return; // 无航向无法转世界系，保持上一拍
+    }
+    // 重力未收敛时 a=0，等效纯轮速，位置连续积分不留空缺
+    const float ax = WheelOdom.gravity_ready ? WheelOdom.imu_ax_nav : 0.0f;
+    const float ay = WheelOdom.gravity_ready ? WheelOdom.imu_ay_nav : 0.0f;
+
+    if (!WheelOdom.kf_x.init)
+    {
+        Odom_Kf2_Init(&WheelOdom.kf_x, WheelOdom.wheel_vx_nav,
+                      ODOM_KF_P0_P, ODOM_KF_P0_V);
+        Odom_Kf2_Init(&WheelOdom.kf_y, WheelOdom.wheel_vy_nav,
+                      ODOM_KF_P0_P, ODOM_KF_P0_V);
+    }
+
+    Odom_Kf2_Predict(&WheelOdom.kf_x, ax, ODOM_FUSION_DT, ODOM_KF_Q_P, ODOM_KF_Q_V);
+    Odom_Kf2_Predict(&WheelOdom.kf_y, ay, ODOM_FUSION_DT, ODOM_KF_Q_P, ODOM_KF_Q_V);
+    Odom_Kf2_Update(&WheelOdom.kf_x, WheelOdom.wheel_vx_nav, ODOM_KF_R_V);
+    Odom_Kf2_Update(&WheelOdom.kf_y, WheelOdom.wheel_vy_nav, ODOM_KF_R_V);
+
+    // 输出：速度保持 fused_* 命名向后兼容，位置为新输出
+    WheelOdom.fused_vx_nav = WheelOdom.kf_x.v;
+    WheelOdom.fused_vy_nav = WheelOdom.kf_y.v;
+    WheelOdom.pos_x_nav    = WheelOdom.kf_x.p;
+    WheelOdom.pos_y_nav    = WheelOdom.kf_y.p;
+}
+
 #else
-    float rel = 0.0f;
-#endif
-    float yaw_c_abs = yaw_g_abs - rel; // 底盘绝对航向
-
-    if (!Odom.inited)
-    {
-        s_chassis_yaw0 = yaw_c_abs;
-        Odom.inited = 1;
-    }
-    Odom.yaw_chassis = yaw_c_abs - s_chassis_yaw0; // 底盘里程计航向
-    Odom.yaw_gimbal = yaw_g_abs - s_chassis_yaw0;  // 云台里程计航向
-    Odom.yaw_rate = ODOM_YAW_SIGN * IMU_Yaw.speed_gyro * DEG2RAD;
-
-    /* ---------- 2. 逆解算：轮速 -> 机体系速度 ---------- */
-    Odom_InverseSolve();
-
-    /* ---------- 3. 量测旋转到世界系 ---------- */
-    // 轮速(底盘机体系) -> 世界系，用底盘航向
-    float cc = arm_cos_f32(Odom.yaw_chassis);
-    float sc = arm_sin_f32(Odom.yaw_chassis);
-    float vx_w_meas = Odom.wheel_vx * cc - Odom.wheel_vy * sc;
-    float vy_w_meas = Odom.wheel_vx * sc + Odom.wheel_vy * cc;
-
-    // 加速度：四元数去重力，得到 IMU 世界系水平加速度（与云台姿态无关）
-    float ax_iw, ay_iw;
-    Odom_AccToWorldHorizontal(&ax_iw, &ay_iw);
-    // 再旋转到里程计世界系（与轮速同一世界系=底盘起始朝向）：
-    // 起始底盘前向在 IMU 世界系朝向 s0，odom-world X=右、Y=前。
-    float s0 = s_chassis_yaw0 + ODOM_ACC_YAW_OFFSET;
-    float cs0 = arm_cos_f32(s0);
-    float ss0 = arm_sin_f32(s0);
-    float ax_w_meas = ax_iw * ss0 - ay_iw * cs0; // odom 世界系 X(右)向加速度
-    float ay_w_meas = ax_iw * cs0 + ay_iw * ss0; // odom 世界系 Y(前)向加速度
-
-    /* ---------- 4. 卡尔曼融合 ---------- */
-    if (s_kf_ok)
-    {
-        vaEstimateKF.MeasuredVector[0] = vx_w_meas; // 世界系 vx (轮速)
-        vaEstimateKF.MeasuredVector[1] = vy_w_meas; // 世界系 vy (轮速)
-        vaEstimateKF.MeasuredVector[2] = ax_w_meas; // 世界系 ax (IMU)
-        vaEstimateKF.MeasuredVector[3] = ay_w_meas; // 世界系 ay (IMU)
-        Kalman_Filter_Update(&vaEstimateKF);
-
-        Odom.vx_world = vaEstimateKF.FilteredValue[0];
-        Odom.vy_world = vaEstimateKF.FilteredValue[1];
-        Odom.ax_world = vaEstimateKF.FilteredValue[2];
-        Odom.ay_world = vaEstimateKF.FilteredValue[3];
-    }
-    else
-    {
-        // 兜底：KF 分配失败时直接用世界系轮速/加速度量测（无融合），保证里程计仍可用
-        Odom.vx_world = vx_w_meas;
-        Odom.vy_world = vy_w_meas;
-        Odom.ax_world = ax_w_meas;
-        Odom.ay_world = ay_w_meas;
-    }
-
-    /* ---------- 5. 世界系积分得到位置 ---------- */
-    Odom.pos_x += Odom.vx_world * ODOM_DT;
-    Odom.pos_y += Odom.vy_world * ODOM_DT;
-    Odom.speed = sqrtf(Odom.vx_world * Odom.vx_world + Odom.vy_world * Odom.vy_world);
-    Odom.total_dist += Odom.speed * ODOM_DT;
-
-    // 融合速度反旋转回机体系，便于与轮速直接对比
-    Odom.vx_body = Odom.vx_world * cc + Odom.vy_world * sc;
-    Odom.vy_body = -Odom.vx_world * sc + Odom.vy_world * cc;
-
-    // 去重力后的机体系加速度（标定用）：静止时任意云台姿态都应≈0；
-    // 推车前进 acc_body_y 应先正后负。pitch 云台时它不再变化即说明去重力成功。
-    Odom.acc_body_x = ax_w_meas * cc + ay_w_meas * sc;
-    Odom.acc_body_y = -ax_w_meas * sc + ay_w_meas * cc;
+void WheelOdom_Update(float gimbal_relative_rad)
+{
+    (void)gimbal_relative_rad;
 }
+#endif

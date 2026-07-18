@@ -238,6 +238,7 @@ void InteractTask(void *argument)
       PowerSend();
     //   _cnt=0;
     // }
+    // set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID, save_zero_point);
     // set_DM_J4310_motor_State(&hfdcan3, xMotorParam[PITCH].ID, save_zero_point);
     // set_DM_J4310_motor_State(&hfdcan3, xMotorParam[YAW].ID, enable);
     // set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[YAW].ID, 0.0f, 0.0f, 0.0f, 0.0f, 5);

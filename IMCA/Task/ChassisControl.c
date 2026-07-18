@@ -51,30 +51,30 @@ void ChassisControlSetValue(void)
     {
         if (xRobotMode.ChassisMode == CHASSIS_SEPARA)
         {
-            chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-            chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
             chassis_vw_channel = 0;
         }
         else if (xRobotMode.ChassisMode == CHASSIS_FOLLOW)
         {
             if (Gimbal_Height_flag == High)
             {
-                chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-                chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
 
                 chassis_vw_channel = -ChassisRotationPID(xMotorParam[YAW].MeasureDM->position, Gimbal_FOLLOWANGLE);
             }
             else
             {
-                chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-                chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
                 chassis_vw_channel = -(float)RcDeadlineLimit(CH3, 10) / 660 * CHASSIS_MAXSPEED / 2;
             }
         }
         else if (xRobotMode.ChassisMode == CHASSIS_GYROSC)
         {
-            chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-            chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
 
             if (ABS(xMotorParam[YAW].MeasureDM->torque) > 9 && !mouse_right.deshake_key)
             {
