@@ -51,7 +51,7 @@ void ChassisControlSetValue(void)
     {
         if (xRobotMode.ChassisMode == CHASSIS_SEPARA)
         {
-            chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
             chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
             chassis_vw_channel = 0;
         }
@@ -59,21 +59,21 @@ void ChassisControlSetValue(void)
         {
             if (Gimbal_Height_flag == High)
             {
-                chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
                 chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
 
                 chassis_vw_channel = -ChassisRotationPID(xMotorParam[YAW].MeasureDM->position, Gimbal_FOLLOWANGLE);
             }
             else
             {
-                chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
                 chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
                 chassis_vw_channel = -(float)RcDeadlineLimit(CH3, 10) / 660 * CHASSIS_MAXSPEED / 2;
             }
         }
         else if (xRobotMode.ChassisMode == CHASSIS_GYROSC)
         {
-            chassis_vy_channel = -(float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
             chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
 
             if (ABS(xMotorParam[YAW].MeasureDM->torque) > 9 && !mouse_right.deshake_key)
@@ -118,11 +118,11 @@ void ChassisControlSetValue(void)
         {
             if (KEY_W)
             {
-                chassis_vy_channel = -CHASSIS_MAXSPEED;
+                chassis_vy_channel = CHASSIS_MAXSPEED;
             }
             else if (KEY_S)
             {
-                chassis_vy_channel = CHASSIS_MAXSPEED;
+                chassis_vy_channel = -CHASSIS_MAXSPEED;
             }
             else
             {
@@ -131,11 +131,11 @@ void ChassisControlSetValue(void)
 
             if (KEY_A)
             {
-                chassis_vx_channel = -CHASSIS_MAXSPEED;
+                chassis_vx_channel = CHASSIS_MAXSPEED;
             }
             else if (KEY_D)
             {
-                chassis_vx_channel = CHASSIS_MAXSPEED;
+                chassis_vx_channel = -CHASSIS_MAXSPEED;
             }
             else
             {
@@ -146,11 +146,11 @@ void ChassisControlSetValue(void)
         {
             if (KEY_W)
             {
-                chassis_vy_channel = -CHASSIS_MAXSPEED / 2; // 不能直接全速前进，否则小陀螺移动就会出现只能移动，不能旋转的情况
+                chassis_vy_channel = CHASSIS_MAXSPEED / 2; // 不能直接全速前进，否则小陀螺移动就会出现只能移动，不能旋转的情况
             }
             else if (KEY_S)
             {
-                chassis_vy_channel = CHASSIS_MAXSPEED / 2;
+                chassis_vy_channel = -CHASSIS_MAXSPEED / 2;
             }
             else
             {
@@ -159,11 +159,11 @@ void ChassisControlSetValue(void)
 
             if (KEY_A)
             {
-                chassis_vx_channel = -CHASSIS_MAXSPEED / 2;
+                chassis_vx_channel = CHASSIS_MAXSPEED / 2;
             }
             else if (KEY_D)
             {
-                chassis_vx_channel = CHASSIS_MAXSPEED / 2;
+                chassis_vx_channel = -CHASSIS_MAXSPEED / 2;
             }
             else
             {
@@ -283,7 +283,6 @@ void ChassisControl_Calculating(void)
         xMotorParam[WHEEL_FL].EcoTar = -Chassis.car_vx + Chassis.car_vy - Chassis.car_vw;
         xMotorParam[WHEEL_BR].EcoTar = -(-Chassis.car_vx + Chassis.car_vy + Chassis.car_vw);
         xMotorParam[WHEEL_BL].EcoTar = Chassis.car_vx + Chassis.car_vy - Chassis.car_vw;
-        // OR_Chassis.vw = xChassisCmdSlowSetVw.out;
     }
     break;
     }

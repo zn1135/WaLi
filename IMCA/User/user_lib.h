@@ -50,8 +50,8 @@ typedef enum {
 } CAN2_Message_ID;
 
 typedef enum {
-    YAW_ID   = 0x01,
-    PITCH_ID = 0x02,
+    PITCH_ID   = 0x12,
+    YAW_ID = 0x11,
     CAP_ID   = 0x108,
 } CAN3_Message_ID;
 
@@ -145,7 +145,7 @@ void TargetAngleProc(motor_param_t *ptr);
 void FloatToUint8_t(float fNum, uint8_t *strBuf, int nLen);
 void relative_angle_processing(motor_param_t *ptr);
 void GetGimbalFrontBackOrientation(motor_param_t *ptr);
-void MotorWatchdogMonitor();
+void MotorWatchdogMonitor(void);
 void Getreceive_yaw_relative_angle(motor_param_t *ptr);
 extern uint8_t RB_Color;
 extern uint8_t RoboHP_flag;

@@ -6,7 +6,7 @@
 #define VISION_INTERACT_H
 
 // MiniPC发送数据长度
-#define MINIPC_SENDLENGTH					32U
+#define MINIPC_SENDLENGTH					44U
 // MiniPC接收数据长度
 #define MINIPC_REVCLENGTH					27U
 #include <stdbool.h>
@@ -20,6 +20,9 @@ typedef struct __attribute__((packed)) MiniPc_SendPacket_Typedef
     float yaw;
     float yaw_vel;
     float pitch;
+    float x;
+    float y;
+    float z;
     uint8_t my_color;
     uint8_t end;
 } MiniPC_SendPacket_Typedef;
@@ -34,6 +37,7 @@ typedef struct __attribute__((packed)) MiniPC_ReceivePacket_Typedef
     float pitch;
     float pitch_vel;
     float pitch_acc;
+
     uint8_t end;
 }MiniPC_ReceivePacket_Typedef;
 

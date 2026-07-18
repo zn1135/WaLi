@@ -1,5 +1,7 @@
 #include "ControlTask.h"
 
+#include <math.h>
+
 #include "CanBus_Task.h"
 #include "CapInteract.h"
 #include "ChassisControl.h"
@@ -113,6 +115,7 @@ void TotalInitTask(void)
     CANFilterInit();            // CAN滤波器初始化
     xRobotMode.CtrlMode = LOSE; // 默认lose状态
 
+    WheelOdom_Init();
 #if (IMU_UPDATA == 1)
     HAL_UARTEx_ReceiveToIdle_DMA_NoIT(&huart5); // 重新使能串口5接收中断
 
@@ -134,7 +137,7 @@ void TotalInitTask(void)
     FirstOrderFilterInit(&xChassisCmdSlowSetVw, CHASSIS_CONTROL_TIME, chassis_w_order_filter);
     // VBatSense_Init(&hadc3, &cfg);
     ADC_handle_Init();
-    Odometry_Init(); // 里程计(轮速+加速度融合)初始化
+
 }
 uint32_t vbat_mv = 0;
 
@@ -160,13 +163,21 @@ void TotalControl(void)
     // todo：陀螺仪坐标系和电机坐标系不一致，导致正负号错误，后续需要重新定义坐标系并修改相关代码
     //  xMotorParam[PITCH].MeasureImu->palstance = -xMotorParam[PITCH].MeasureDM->velocity;
 #endif
-    Odometry_Update(); // 里程计更新：麦轮逆解算 + 加速度卡尔曼融合 + 世界系积分
+
     CtrlModeSelect();
     FirstOrderFilterCali(&mouse_x, MOUSE_X); // 一阶低通滤波
     FirstOrderFilterCali(&mouse_y, MOUSE_Y); // 一阶低通滤波
     // xMotorParam[Leg_RB].MeasureLINK->encoder = (xMotorParam[Leg_RB].MeasureLINK->encoder<3.14)?3.14-xMotorParam[Leg_RB].MeasureLINK->encoder:9.42-xMotorParam[Leg_RB].MeasureLINK->encoder;
     deshake_all(); // 按键消抖（没有用到）
     TotalControlSetValue();
+    // 验证阶段：轮速->世界系速度 与 IMU->世界系加速度 各自独立解算
+    // 注意：直接用与 ChassisControl 小陀螺相同的公式，避免 receive_yaw_relative_rad
+    // 在小陀螺模式下由 GetPositionRelativeAngle_front() 设置时存在的单位混乱
+    // (position[度] - Gimbal_FrontAngle[度]) / 180 * PI → 弧度，与底盘控制完全一致
+    WheelOdom_Update(
+        (xMotorParam[YAW].MeasureDM->position - Gimbal_FrontAngle) / 180.0f * 3.14159265f
+    );
+
     // Vofa_Send_Data8( Cap_Measure.battary_power,//0
     //                 Cap_Measure.chassis_power, //1
     //                Cap_Measure.cap_power, //2
@@ -215,8 +226,8 @@ void TotalControl(void)
     // );
     HAL_ADC_Start(&hadc1); // 想做电池电压，但硬件没有做好
     HAL_ADC_Start(&hadc3);
-    //      Vofa_Send_Data8(xMotorParam[FRICTR].MeasureEco->speed_rpm,//0
-    //               xMotorParam[FRICTL].MeasureEco->speed_rpm, //1
+    //      Vofa_Send_Data8(xMotorParam[PITCH].MeasureDM->velocity,//0
+    //               xMotorParam[PITCH].MeasureDM->position, //1
     //              xMotorParam[FRICTR].EcoTar , //2
     //                FireSpeed(), //3
     //               xMotorParam[Height].EcoTar, //4
@@ -247,32 +258,31 @@ void TotalControl(void)
     //                 xMotorParam[YAW].MeasureDM->velocity - xMotorParam[YAW].MeasureDM->last_v, // 5
     //                 xMotorParam[YAW].MeasureDM->velocity,                                      // 6
     //                 Stuck_YAW_cnt);
-    // ===== 里程计标定打印（标定完成后可改回上面的打印）=====
-    // ch2/ch5 现在是【四元数去重力后】的机体系加速度。关键验证：
-    //   1) 车不动，用手俯仰/转动云台 -> ch2、ch5 应保持≈0、不随 pitch 变化。
-    //      若仍随云台姿态变化 -> 四元数约定不对，把 Odometry.c 里 ODOM_QUAT_CONJ 置 1 再试。
-    //   2) 推车前进 -> ch2 先正(加速)后负(减速)；右移 -> ch5 同理。
-    // ch0/ch3 轮速符号：前进 ch0>0、右移 ch3>0 为正确，反了翻 ODOM_VY_SIGN/ODOM_VX_SIGN。
-    // ch1/ch4(融合) 正常时贴着 ch0/ch3 走、会被盖住，要看就把 ch0/ch3 隐藏。
-    //   注意：必须【推动底盘】ch1/ch4 才有值；车静止时它们=0 是正常的。
-    // ch7 位置：直线推 1m 看是否≈1m，标定 CHASSIS_WHEEL_RADIUS。
-    Vofa_Send_Data8(Odom.wheel_vy,    // 0 前后速度（轮速逆解算）
-                    Odom.vy_body,     // 1 前后速度（卡尔曼融合，应贴着 ch0）
-                    Odom.acc_body_y,  // 2 前后加速度（去重力, m/s^2）
-                    Odom.wheel_vx,    // 3 左右速度（轮速逆解算）
-                    Odom.vx_body,     // 4 左右速度（卡尔曼融合，应贴着 ch3）
-                    Odom.acc_body_x,  // 5 左右加速度（去重力, m/s^2）
-                    Odom.yaw_chassis, // 6 底盘航向 (rad)
-                    Odom.pos_gimbal_y); // 7 云台前后位移 (m)
-    // Vofa_Send_Data8(-MiniPC_ReceivePacket.pitch,//0
-    //                 xMotorParam[PITCH].MeasureImu->angle, //1
-    //                  xMotorParam[PITCH].TempCalc  , //2
-    //                 xMotorParam[PITCH].MeasureImu->palstance, //3
-    //                 xMotorParam[PITCH].CurrentOutput,//4
-    //                 IMU_Pitch.speed_gyro/180*PI, //5
-    //                 xMotorParam[YAW].ImuTar-xMotorParam[YAW].MeasureImu->total_angle, //6
-    //                 Stuck_YAW_cnt //7
+    // VOFA 验证：轮速世界系速度 vs IMU 世界系加速度，各自独立
+    // 诊断：相对角正确性验证
+    // 小陀螺旋转时: ch0稳定(云台锁世界), ch1变化, ch2=ch0-ch1同步变化, ch3≈ch1(两者应相等)
+    // 静止时:       ch1/ch2/ch3都应为常数
+    // Vofa_Send_Data8(
+    //     WheelOdom.dbg_gimbal_yaw,   // 0 云台世界yaw (IMU, rad) — 小陀螺时应稳定
+    //     WheelOdom.dbg_gimbal_rel,   // 1 传入的相对角 (rad)    — 随底盘转变化
+    //     WheelOdom.chassis_yaw_cont, // 2 底盘世界yaw连续 (rad) — 应=ch0-ch1
+    //     xRelativeAngle.receive_yaw_relative_rad, // 3 旧receive值对比 — 应≈ch1
+    //     WheelOdom.head_sync,        // 4 同源航向 (rad)        — 应跟ch2
+    //     WheelOdom.wheel_vx_gimbal,  // 5 云台系VX (m/s，右)    — θ≈0时应≈车体系vx
+    //     WheelOdom.wheel_vy_gimbal,  // 6 云台系VY (m/s，前)    — θ≈0时应≈车体系vy
+    //     WheelOdom.wheel_speed_body  // 7 |v_body| (m/s)
     // );
+    // KF 位置与协方差观察帧
+    Vofa_Send_Data8(
+        WheelOdom.pos_x_nav,   // 0 世界系X位移 (m，开机归零)
+        WheelOdom.pos_y_nav,   // 1 世界系Y位移 (m，开机归零)
+        WheelOdom.fused_vx_nav,// 2 KF速度X (m/s)
+        WheelOdom.fused_vy_nav,// 3 KF速度Y (m/s)
+        WheelOdom.kf_x.P00,   // 4 位置协方差X (应收敛到小值)
+        WheelOdom.kf_y.P00,   // 5 位置协方差Y
+        WheelOdom.kf_x.P11,   // 6 速度协方差X
+        WheelOdom.kf_y.P11    // 7 速度协方差Y
+    );
     // Vofa_Send_Data16(xMotorParam[WHEEL_FR].MeasureEco->speed_rpm,//0
     //                 xMotorParam[WHEEL_FL].MeasureEco->speed_rpm  , //1
     //                 xMotorParam[WHEEL_BR].MeasureEco->speed_rpm , //2
