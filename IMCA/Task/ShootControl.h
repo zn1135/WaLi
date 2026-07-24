@@ -19,6 +19,7 @@ typedef struct
 }shoot_t;
 extern uint16_t held_cnt;//Cumulative count
 extern uint8_t single_shot;
+extern uint8_t  Stuck_Bullet_falg;
 void ShootControlSetValue(void);
 void PluckControl();
 #endif //SHOOTCONTROL_H

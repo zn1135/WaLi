@@ -230,15 +230,15 @@ void PluckControl()
 				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle;
 			}
 		}
-		if(ABS(xMotorParam[PLUCK].MeasureEco->real_current) > 8000)
+		if(ABS(xMotorParam[PLUCK].MeasureEco->real_current) > 6000)
 		{
 			Stuck_Bullet_cnt ++;
-			if(Stuck_Bullet_cnt >200)
+			if(Stuck_Bullet_cnt >100)
 			{
 				Stuck_Bullet_falg = 1;
 				xMotorParam[PLUCK].CloseLoopMode = PosClsloop;
 				//				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureDJI->total_angle - 36864;8192*36*2.5/9
-				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle - 8192*36*2.5/9/2;
+				xMotorParam[PLUCK].EcoTar = xMotorParam[PLUCK].MeasureEco->total_angle - (8192*36/8);
 				Stuck_Bullet_cnt = 0;
 			}
 		}

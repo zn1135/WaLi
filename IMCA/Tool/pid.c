@@ -118,12 +118,15 @@ void PID_struct_init(
 
 
  */
+
+#define LQR_AUTO_K_THETA_DEFAULT            20.0f
+#define LQR_AUTO_K_OMEGA_DEFAULT            2.94751876f
 void PidInit(void)
 {
     PID_struct_init(&Chassis_Power, POSITION_PID, 1.0f, 0.0, 0.025f, 0.000f, 0.0f);
 
-    PID_struct_init(&Automatic_aiming_pos, POSITION_PID, 5, 0.8, 0.8f, 0.060f, 1.00f);
-    PID_struct_init(&Automatic_aiming_spd, POSITION_PID, 4, 1, 0.050f, 0.00f, 0.0f);
+    PID_struct_init(&Automatic_aiming_pos, POSITION_PID, 10, 0.8,  LQR_AUTO_K_THETA_DEFAULT, 0.000f, 0.00f);
+    PID_struct_init(&Automatic_aiming_spd, POSITION_PID, 10, 1, LQR_AUTO_K_OMEGA_DEFAULT, 0.00f, 0.0f);
 
     PID_struct_init(&Chassis_Rotate, POSITION_PID, 5000, 100, 150.0f, 0.2f, 0.0f);
 
@@ -148,7 +151,7 @@ void PidInit(void)
 
 
     PID_struct_init(&xMotorPid[POS][ECO][PLUCK], POSITION_PID, 10000, 8000, 0.38f, 0.0f, 0.0f);
-    PID_struct_init(&xMotorPid[SPD][ECO][PLUCK], POSITION_PID, 15000, 1000, 12.0f, 0.0f, 0.0f);//10000, 6000, 8.0f, 1.9f, 3.0f
+    PID_struct_init(&xMotorPid[SPD][ECO][PLUCK], POSITION_PID, 10000, 1000, 12.0f, 0.0f, 0.0f);//10000, 6000, 8.0f, 1.9f, 3.0f
 
 
 

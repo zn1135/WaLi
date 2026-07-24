@@ -52,7 +52,7 @@ void ChassisControlSetValue(void)
         if (xRobotMode.ChassisMode == CHASSIS_SEPARA)
         {
             chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-            chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
             chassis_vw_channel = 0;
         }
         else if (xRobotMode.ChassisMode == CHASSIS_FOLLOW)
@@ -60,21 +60,21 @@ void ChassisControlSetValue(void)
             if (Gimbal_Height_flag == High)
             {
                 chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-                chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
 
                 chassis_vw_channel = -ChassisRotationPID(xMotorParam[YAW].MeasureDM->position, Gimbal_FOLLOWANGLE);
             }
             else
             {
                 chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-                chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+                chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
                 chassis_vw_channel = -(float)RcDeadlineLimit(CH3, 10) / 660 * CHASSIS_MAXSPEED / 2;
             }
         }
         else if (xRobotMode.ChassisMode == CHASSIS_GYROSC)
         {
             chassis_vy_channel = (float)RcDeadlineLimit(CH2, 10) / 660 * CHASSIS_MAXSPEED;
-            chassis_vx_channel = (float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
+            chassis_vx_channel = -(float)RcDeadlineLimit(CH1, 10) / 660 * CHASSIS_MAXSPEED;
 
             if (ABS(xMotorParam[YAW].MeasureDM->torque) > 9 && !mouse_right.deshake_key)
             {
@@ -206,6 +206,7 @@ void ChassisControlSetValue(void)
 
             chassis_vw_channel = (CHASSIS_MAXSPEED - sqrt((chassis_vx_channel * chassis_vx_channel + chassis_vy_channel * chassis_vy_channel))) * GYROSC_direction; // 小陀螺模式下，底盘旋转速度与底盘线速度成反比，底盘线速度越大，旋转速度越慢，解决了小陀螺模式下，底盘走不直问题，但还是有点漂移，问题是因为功率限制的
         }
+
     }
     if (xRobotMode.ChassisMode == CHASSIS_FOLLOW)
     {

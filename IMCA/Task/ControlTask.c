@@ -129,6 +129,7 @@ void TotalInitTask(void)
     HAL_UARTEx_ReceiveToIdle_DMA_NoIT(&hlpuart1); /*启动串口空闲中断，用于接收VT发来的数据*/
     MotorInit();                                  // 电机参数初始化
     PidInit();                                    // pid初始化
+
     const static float chassis_x_order_filter[1] = {CHASSIS_ACCEL_X_NUM};
     const static float chassis_y_order_filter[1] = {CHASSIS_ACCEL_Y_NUM};
     const static float chassis_w_order_filter[1] = {CHASSIS_ACCEL_W_NUM};
@@ -272,17 +273,27 @@ void TotalControl(void)
     //     WheelOdom.wheel_vy_gimbal,  // 6 云台系VY (m/s，前)    — θ≈0时应≈车体系vy
     //     WheelOdom.wheel_speed_body  // 7 |v_body| (m/s)
     // );
-    // KF 位置与协方差观察帧
+    // yaw系统辨识帧。辨识完成后将GIMBAL_YAW_IDENT_ENABLE改回0即可恢复原VOFA帧。
+
     Vofa_Send_Data8(
-        WheelOdom.pos_x_nav,   // 0 世界系X位移 (m，开机归零)
-        WheelOdom.pos_y_nav,   // 1 世界系Y位移 (m，开机归零)
-        WheelOdom.fused_vx_nav,// 2 KF速度X (m/s)
-        WheelOdom.fused_vy_nav,// 3 KF速度Y (m/s)
-        WheelOdom.kf_x.P00,   // 4 位置协方差X (应收敛到小值)
-        WheelOdom.kf_y.P00,   // 5 位置协方差Y
-        WheelOdom.kf_x.P11,   // 6 速度协方差X
-        WheelOdom.kf_y.P11    // 7 速度协方差Y
+ xMotorParam[PLUCK].MeasureEco->angle ,        // I0 实际发送力矩 (N*m)
+        xMotorParam[PLUCK].Timeout_Flag,          // I1 IMU总角度 (rad)
+        xMotorParam[PLUCK].EcoTar,     // I2 IMU角速度 (rad/s)
+        xMotorParam[PLUCK].CurrentOutput,       // I3 DWT单调时间戳 (ms)
+        xMotorParam[PLUCK].MeasureEco->real_current,        // I4 限幅/斜坡后的请求力矩 (N*m)
+        Stuck_Bullet_falg, // I5 相对起点角度 (rad)
+        xMotorParam[PITCH].EcoTar ,     // I6 1=有效辨识样本
+         xMotorParam[PITCH].MeasureDM->position       // I7 本拍真实dt (ms)
+        // xMotorParam[FRICTL].MeasureEco->speed_rpm,//
+        // xMotorParam[FRICTR].MeasureEco->speed_rpm,//
+        // 0,
+        // 0,
+        // 0,
+        // 0,
+        // 0,
+        // 0
     );
+
     // Vofa_Send_Data16(xMotorParam[WHEEL_FR].MeasureEco->speed_rpm,//0
     //                 xMotorParam[WHEEL_FL].MeasureEco->speed_rpm  , //1
     //                 xMotorParam[WHEEL_BR].MeasureEco->speed_rpm , //2

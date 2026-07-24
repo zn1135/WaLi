@@ -57,7 +57,7 @@ typedef enum {
 
 // DM电机配置参数
 #define P_MAX  3.141592f
-#define P_MIN  -3.141592f
+#define P_MIN  -3.//
 
 #define V_MAX  30
 #define V_MIN  -30
@@ -126,9 +126,14 @@ typedef struct {
 // 68.601784
 
 // 相关的全局变量定义
-#define Gimbal_FrontAngle     89.931784f
-#define Gimbal_backAngle      89.931784 - 180.0f //
-#define Moment_of_Inertia     0.074867862        // 0.01006421849
+#define Gimbal_FrontAngle     92.703f
+#define Gimbal_backAngle        92.703- 180.0f //
+#define GIMBAL_YAW_J          0.175701f  // kg*m^2
+#define GIMBAL_YAW_B          0.057705f  // N*m*s/rad
+#define GIMBAL_YAW_FC         0.220767f  // N*m
+#define GIMBAL_YAW_TAU0       0.017746f  // N*m
+#define GIMBAL_YAW_FC_SMOOTH  0.15f      // rad/s
+#define Moment_of_Inertia     GIMBAL_YAW_J
 #define PI                    3.14159265358979f  /*圆周率*/
 #define Eco_to_Degree         0.000095826f
 #define wheel_const           1000.0f
@@ -143,6 +148,7 @@ typedef struct {
 float AngleLimit(float tar, float max_angle, float min_angle);
 void TargetAngleProc(motor_param_t *ptr);
 void FloatToUint8_t(float fNum, uint8_t *strBuf, int nLen);
+float DWT_GetMonotonicTimestampMs(void);
 void relative_angle_processing(motor_param_t *ptr);
 void GetGimbalFrontBackOrientation(motor_param_t *ptr);
 void MotorWatchdogMonitor(void);

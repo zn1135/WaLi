@@ -4,6 +4,7 @@
 
 #include "GimbalControl.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -166,16 +167,21 @@ void GimbalControlSetValue(void)
                     vision_yaw = MiniPC_ReceivePacket.yaw;
 
                     yaw_pos = MiniPC_ReceivePacket.yaw;
-                    xMotorParam[YAW].ImuTar = MiniPC_ReceivePacket.yaw / PI * 180;
+                    xMotorParam[YAW].ImuTar = MiniPC_ReceivePacket.yaw;
                     // yaw_vel=MiniPC_ReceivePacket.yaw_vel;
                     TargetAngleProc(&xMotorParam[YAW]);
 
                     // 位置环+速度环+前馈组合，提高跟踪响应
-                    pid_calc(&Automatic_aiming_pos, xMotorParam[YAW].MeasureImu->angle, xMotorParam[YAW].ImuTar);
-                    pid_calc(&Automatic_aiming_spd, xMotorParam[YAW].MeasureImu->palstance, MiniPC_ReceivePacket.yaw_vel / PI * 180);
+                    pid_calc(&Automatic_aiming_pos, xMotorParam[YAW].MeasureImu->angle / 180 * PI, xMotorParam[YAW].ImuTar);
+                    pid_calc(&Automatic_aiming_spd, xMotorParam[YAW].MeasureImu->palstance / 180 * PI, MiniPC_ReceivePacket.yaw_vel);
                     //     yaw_output=Moment_of_Inertia*(MiniPC_ReceivePacket.yaw_acc)+18.0f*(MiniPC_ReceivePacket.yaw-xMotorParam[YAW].MeasureImu->angle/(180/PI));
 
-                    yaw_output = Automatic_aiming_pos.pos_out + Moment_of_Inertia * (MiniPC_ReceivePacket.yaw_acc) + Automatic_aiming_spd.pos_out;
+                    yaw_output = Automatic_aiming_pos.pos_out +
+                                 GIMBAL_YAW_J * MiniPC_ReceivePacket.yaw_acc +
+                                 GIMBAL_YAW_B * MiniPC_ReceivePacket.yaw_vel +
+                                 GIMBAL_YAW_FC * tanhf(MiniPC_ReceivePacket.yaw_vel / GIMBAL_YAW_FC_SMOOTH) +
+                                 GIMBAL_YAW_TAU0 +
+                                 Automatic_aiming_spd.pos_out;
                     abs_limit(&yaw_output, 10); // 限幅（现在是冗余设计）
 
                     /*记录角度标志位*/
@@ -307,7 +313,7 @@ void GimbalControlSetValue(void)
                         if (Gimbal_Height_flag == Low)
                         {
                             // 到位后立即停止，清空动作标志
-                            xMotorParam[PITCH].EcoTar = -0.0f;
+                            xMotorParam[PITCH].EcoTar = 0.05f;
                             xMotorParam[Height].EcoTar = 0.0f;
                             highlow_flag = 0;
                         }
@@ -348,6 +354,14 @@ void GimbalControlSetValue(void)
                 // }else if (KEY_D) {
                 //     xMotorParam[YAW].ImuTar-=0.0005f;
                 // }
+            }
+        }
+        if (RC_UPPER_RIGHT_SW_DOWN)//test:增加了手动发弹测试的pitch和yaw运动
+        {
+            if (Gimbal_Height_flag == High)
+            {
+                xMotorParam[PITCH].EcoTar -= RcDeadlineLimit(CH2, 25) * 0.000008;
+                xMotorParam[YAW].ImuTar -= RcDeadlineLimit(CH1, 25) * 0.0008;
             }
         }
     }

@@ -20,6 +20,62 @@ uint8_t RoboHP_flag;
 uint8_t yaw_position[4];
 float Gimbal_FOLLOWANGLE = Gimbal_FrontAngle;
 uint8_t Motor_TimeOut_flag = 0;
+
+/**********************************************************************************************************************
+ * @Func     float DWT_GetMonotonicTimestampMs(void)
+ * @Brief    获取从首次调用开始计时的DWT单调时间戳
+ * @Param    无
+ * @Retval   单调时间戳，单位ms
+ * @Note     使用无符号差值扩展32位CYCCNT回绕；调用间隔必须小于一次CYCCNT回绕周期
+ *********************************************************************************************************************/
+float DWT_GetMonotonicTimestampMs(void)
+{
+    static uint8_t initialized = 0U;
+    static uint32_t last_cycle = 0U;
+    static uint64_t accumulated_cycles = 0U;
+    uint64_t cycles_snapshot;
+    uint64_t whole_seconds;
+    uint32_t remaining_cycles;
+    uint32_t now_cycle;
+    uint32_t primask;
+    uint32_t clock_hz;
+
+    clock_hz = SystemCoreClock;
+    if (clock_hz == 0U)
+    {
+        return 0.0f;
+    }
+
+    primask = __get_PRIMASK();
+    __disable_irq();
+
+    if (!initialized)
+    {
+        CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+        DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+        last_cycle = DWT->CYCCNT;
+        accumulated_cycles = 0U;
+        initialized = 1U;
+    }
+    else
+    {
+        now_cycle = DWT->CYCCNT;
+        accumulated_cycles += (uint32_t)(now_cycle - last_cycle);
+        last_cycle = now_cycle;
+    }
+
+    cycles_snapshot = accumulated_cycles;
+    if (!primask)
+    {
+        __enable_irq();
+    }
+
+    whole_seconds = cycles_snapshot / clock_hz;
+    remaining_cycles = (uint32_t)(cycles_snapshot % clock_hz);
+    return (float)whole_seconds * 1000.0f +
+           (float)remaining_cycles * 1000.0f / (float)clock_hz;
+}
+
 /**
  * @brief 角度限制函数
  *
