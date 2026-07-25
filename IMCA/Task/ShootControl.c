@@ -26,8 +26,8 @@ uint8_t  Stuck_Bullet_falg = 0;
 /* 射速控制参数 */
 // #define RICT_Speed 6720    // 摩擦轮转速(rpm)
 #define MaxShootSpeed  5000 // 最大射速(rpm)
-#define MaxRateRate 0.4    // 保持最大射速的比率 (0.0 - 1.0)
-#define ReservedHert 30    // 预留热量
+#define MaxRateRate 0.5    // 保持最大射速的比率 (0.0 - 1.0)
+#define ReservedHert 50    // 预留热量
 
 /* 机械参数 */
 #define SingleHeat 10               // 单发热量

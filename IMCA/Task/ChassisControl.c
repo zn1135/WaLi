@@ -118,11 +118,11 @@ void ChassisControlSetValue(void)
         {
             if (KEY_W)
             {
-                chassis_vy_channel = -CHASSIS_MAXSPEED;
+                chassis_vy_channel = CHASSIS_MAXSPEED;
             }
             else if (KEY_S)
             {
-                chassis_vy_channel = CHASSIS_MAXSPEED;
+                chassis_vy_channel = -CHASSIS_MAXSPEED;
             }
             else
             {
@@ -131,11 +131,11 @@ void ChassisControlSetValue(void)
 
             if (KEY_A)
             {
-                chassis_vx_channel = -CHASSIS_MAXSPEED;
+                chassis_vx_channel = CHASSIS_MAXSPEED;
             }
             else if (KEY_D)
             {
-                chassis_vx_channel = CHASSIS_MAXSPEED;
+                chassis_vx_channel = -CHASSIS_MAXSPEED;
             }
             else
             {
@@ -146,11 +146,11 @@ void ChassisControlSetValue(void)
         {
             if (KEY_W)
             {
-                chassis_vy_channel = -CHASSIS_MAXSPEED / 2; // 不能直接全速前进，否则小陀螺移动就会出现只能移动，不能旋转的情况
+                chassis_vy_channel = CHASSIS_MAXSPEED / 2; // 不能直接全速前进，否则小陀螺移动就会出现只能移动，不能旋转的情况
             }
             else if (KEY_S)
             {
-                chassis_vy_channel = CHASSIS_MAXSPEED / 2;
+                chassis_vy_channel = -CHASSIS_MAXSPEED / 2;
             }
             else
             {
@@ -159,11 +159,11 @@ void ChassisControlSetValue(void)
 
             if (KEY_A)
             {
-                chassis_vx_channel = -CHASSIS_MAXSPEED / 2;
+                chassis_vx_channel = CHASSIS_MAXSPEED / 2;
             }
             else if (KEY_D)
             {
-                chassis_vx_channel = CHASSIS_MAXSPEED / 2;
+                chassis_vx_channel = -CHASSIS_MAXSPEED / 2;
             }
             else
             {

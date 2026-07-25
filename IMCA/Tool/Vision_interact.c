@@ -65,7 +65,7 @@ void MiniPC_SendVisionFrameInfo(MiniPC_SendPacket_Typedef *SendPacket)
     else
         MiniPC_SendPacket.mode = 0;
     MiniPC_SendPacket.yaw = IMU_Yaw.angle * PI / 180;
-    MiniPC_SendPacket.yaw_vel = IMU_Yaw.speed_gyro;
+    MiniPC_SendPacket.yaw_vel = IMU_Yaw.speed_gyro  /180 * PI;
     //	MiniPC_SendPacket.yaw = xMotorParam[YAW].MeasureDM->position;
     //	MiniPC_SendPacket.pitch = xMotorParam[PITCH].MeasureDM->position;
     MiniPC_SendPacket.x=WheelOdom.pos_y_nav;

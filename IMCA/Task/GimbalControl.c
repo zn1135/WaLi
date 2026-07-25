@@ -166,16 +166,21 @@ void GimbalControlSetValue(void)
                     vision_yaw = MiniPC_ReceivePacket.yaw;
 
                     yaw_pos = MiniPC_ReceivePacket.yaw;
-                    xMotorParam[YAW].ImuTar = MiniPC_ReceivePacket.yaw / PI * 180;
+                    xMotorParam[YAW].ImuTar = MiniPC_ReceivePacket.yaw;
                     // yaw_vel=MiniPC_ReceivePacket.yaw_vel;
                     TargetAngleProc(&xMotorParam[YAW]);
 
                     // 位置环+速度环+前馈组合，提高跟踪响应
-                    pid_calc(&Automatic_aiming_pos, xMotorParam[YAW].MeasureImu->angle, xMotorParam[YAW].ImuTar);
-                    pid_calc(&Automatic_aiming_spd, xMotorParam[YAW].MeasureImu->palstance, MiniPC_ReceivePacket.yaw_vel / PI * 180);
+                    pid_calc(&Automatic_aiming_pos, xMotorParam[YAW].MeasureImu->angle / 180 * PI, xMotorParam[YAW].ImuTar);
+                    pid_calc(&Automatic_aiming_spd, xMotorParam[YAW].MeasureImu->palstance / 180 * PI, MiniPC_ReceivePacket.yaw_vel);
                     //     yaw_output=Moment_of_Inertia*(MiniPC_ReceivePacket.yaw_acc)+18.0f*(MiniPC_ReceivePacket.yaw-xMotorParam[YAW].MeasureImu->angle/(180/PI));
 
-                    yaw_output = Automatic_aiming_pos.pos_out + Moment_of_Inertia * (MiniPC_ReceivePacket.yaw_acc) + Automatic_aiming_spd.pos_out;
+                    yaw_output = Automatic_aiming_pos.pos_out +
+                                 GIMBAL_YAW_J * MiniPC_ReceivePacket.yaw_acc +
+                                 GIMBAL_YAW_B * MiniPC_ReceivePacket.yaw_vel +
+                                 GIMBAL_YAW_FC * tanhf(MiniPC_ReceivePacket.yaw_vel / GIMBAL_YAW_FC_SMOOTH) +
+                                 GIMBAL_YAW_TAU0 +
+                                 Automatic_aiming_spd.pos_out;
                     abs_limit(&yaw_output, 10); // 限幅（现在是冗余设计）
 
                     /*记录角度标志位*/
@@ -220,10 +225,10 @@ void GimbalControlSetValue(void)
                 {
                     // SHIFT+X 触发上升，触发后保持输出直到检测到 High 到位
                     static uint16_t highlow_Init_cnt = 0;
-                    if (ABS(xMotorParam[Height].MeasureEco->real_current) > 8000)
+                    if (ABS(xMotorParam[Height].MeasureEco->real_current) > 9000)
                     {
                         Stuck_Hight_cnt++;
-                        if (Stuck_Hight_cnt > 50)
+                        if (Stuck_Hight_cnt > 100)
                         {
                             Stuck_Hight_flag = 1;
                             xMotorParam[Height].EcoTar = 0.0f;
@@ -247,7 +252,7 @@ void GimbalControlSetValue(void)
                     else if (highlow_flag == 1)
                     {
 
-                        if (ABS(High_Low_Start_angle - xMotorParam[Height].MeasureEco->total_angle) > 2200000)
+                        if (ABS(High_Low_Start_angle - xMotorParam[Height].MeasureEco->total_angle) > 2500000)
                         {
                             // 如果长时间未检测到高位到达，强制停止升降，避免过流损伤
                             xMotorParam[Height].EcoTar = -5000.0f;
@@ -288,7 +293,7 @@ void GimbalControlSetValue(void)
                             if (highlow_Init_cnt >= 50)
                             {
                                 highlow_Init_cnt = 0;
-                                if (ABS(High_Low_Start_angle - xMotorParam[Height].MeasureEco->total_angle) > 2100000)
+                                if (ABS(High_Low_Start_angle - xMotorParam[Height].MeasureEco->total_angle) > 2500000)
                                 {
                                     // 给一个较大的目标值，确保能快速下降到位，如果检测到已经接近低位了，则降低目标值，避免过冲
                                     xMotorParam[Height].EcoTar = 5000.0f;
@@ -348,6 +353,14 @@ void GimbalControlSetValue(void)
                 // }else if (KEY_D) {
                 //     xMotorParam[YAW].ImuTar-=0.0005f;
                 // }
+            }
+        }
+        if (RC_UPPER_RIGHT_SW_DOWN)//test:增加了手动发弹测试的pitch和yaw运动
+        {
+            if (Gimbal_Height_flag == High)
+            {
+                xMotorParam[PITCH].EcoTar -= RcDeadlineLimit(CH2, 25) * 0.000008;
+                xMotorParam[YAW].ImuTar -= RcDeadlineLimit(CH1, 25) * 0.0008;
             }
         }
     }

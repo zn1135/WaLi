@@ -126,6 +126,15 @@ typedef struct {
 // 68.601784
 
 // 相关的全局变量定义
+
+#define GIMBAL_YAW_J          0.175701f  // kg*m^2
+#define GIMBAL_YAW_B          0.057705f  // N*m*s/rad
+#define GIMBAL_YAW_FC         0.220767f  // N*m
+#define GIMBAL_YAW_TAU0       0.017746f  // N*m
+#define GIMBAL_YAW_FC_SMOOTH  0.15f      // rad/s
+#define Moment_of_Inertia     GIMBAL_YAW_J
+
+
 #define Gimbal_FrontAngle     88.081459f
 #define Gimbal_backAngle      88.081459f - 180.0f //
 #define Moment_of_Inertia     0.074867862        // 0.01006421849

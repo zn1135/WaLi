@@ -39,6 +39,22 @@ uint8_t aRxBuffer1[150];
 uint8_t Gimbal_Height_flag = High;
 uint8_t cnt = 0;
 uint8_t fh = 0;
+
+/* 摩擦轮前馈参数：先保持零系数观察基线，再根据实车数据逐步调节。 */
+#define FRICTION_FF_C_ACC               1.5f
+#define FRICTION_FF_C_DIFF              20.0f
+#define FRICTION_FF_GAIN         0.0f         // 加速度前馈总增益
+#define FRICTION_FF_DT_S         0.001f       // 控制周期，单位：s（1 kHz）
+#define FRICTION_FF_ACCEL_ALPHA  0.05f        // 加速度一阶低通滤波系数
+#define FRICTION_FF_OUTPUT_LIMIT 16384.0f     // M3508 最终电流输出限幅
+#define RPM_TO_RAD_PER_SEC       0.104719755f // rpm 转 rad/s：2π/60
+
+/* 前馈计算的历史状态，仅在本文件内部使用。 */
+static float s_friction_last_speed_l;
+static float s_friction_last_speed_r;
+static float s_friction_accel_l;
+static float s_friction_accel_r;
+static uint8_t s_friction_ff_initialized;
 #define GPIO_DEBOUNCE_MAX_ITEMS 16U // 最多支持的GPIO消抖通道数
 
 #if (GPIO_DEBOUNCE_TICKS < 5U)
@@ -171,14 +187,14 @@ void TotalControl(void)
     deshake_all(); // 按键消抖（没有用到）
     TotalControlSetValue();
     Vofa_Send_Data8(
-        WheelOdom.pos_x_nav,   // 0 世界系X位移 (m，开机归零)
-        WheelOdom.pos_y_nav,   // 1 世界系Y位移 (m，开机归零)
-        WheelOdom.fused_vx_nav,// 2 KF速度X (m/s)
-        WheelOdom.fused_vy_nav,// 3 KF速度Y (m/s)
-        WheelOdom.kf_x.P00,   // 4 位置协方差X (应收敛到小值)
-        WheelOdom.kf_y.P00,   // 5 位置协方差Y
-        WheelOdom.kf_x.P11,   // 6 速度协方差X
-        WheelOdom.kf_y.P11    // 7 速度协方差Y
+         xMotorParam[YAW].Timeout_Flag ,  // 0 右摩擦轮实际转速 (rpm)
+         High_Low_Start_angle - xMotorParam[Height].MeasureEco->total_angle,  // 1 左摩擦轮实际转速 (rpm)
+        xMotorParam[Height].MeasureEco->speed_rpm,                                // 2 实测弹速 (m/s)
+        xMotorParam[Height].MeasureEco->real_current,                 // 3 右摩擦轮目标转速 (rpm)
+        GPIO_Read(GPIOC, High_GPIO),                 // 4 左摩擦轮目标转速 (rpm)
+        GPIO_Read(GPIOC, Low_GPIO),                         // 5 右摩擦轮滤波加速度 (rad/s²)
+        s_friction_accel_l,                         // 6 左摩擦轮滤波加速度 (rad/s²)
+        -xMotorParam[FRICTL].MeasureEco->speed_rpm // 7 归一化转速差：左轮幅值-右轮幅值 (rpm)
     );
     // Vofa_Send_Data8( xMotorParam[FRICTR].MeasureEco->speed_rpm,//0
     //           xMotorParam[FRICTL].MeasureEco->speed_rpm, //1
@@ -380,6 +396,73 @@ void CtrlModeSelect(void)
         ;
 }
 
+static float FrictionFeedforwardLimit(float output)
+{
+    // 前馈叠加在 PID 输出之后，因此必须再次限制最终发送电流。
+    if (output > FRICTION_FF_OUTPUT_LIMIT)
+    {
+        return FRICTION_FF_OUTPUT_LIMIT;
+    }
+    if (output < -FRICTION_FF_OUTPUT_LIMIT)
+    {
+        return -FRICTION_FF_OUTPUT_LIMIT;
+    }
+    return output;
+}
+
+static void FrictionFeedforwardCalc(void)
+{
+    // 左轮为负转，右轮为正转；这里保留反馈转速的原始符号。
+    const float speed_l = (float)xMotorParam[FRICTL].MeasureEco->speed_rpm;
+    const float speed_r = (float)xMotorParam[FRICTR].MeasureEco->speed_rpm;
+
+    // 禁射、失控或任意一侧目标为零时立即旁路前馈，并清空历史状态。
+    if (xRobotMode.CtrlMode == LOSE ||
+        xMotorParam[FRICTL].EcoTar == 0.0f ||
+        xMotorParam[FRICTR].EcoTar == 0.0f)
+    {
+        s_friction_last_speed_l = 0.0f;
+        s_friction_last_speed_r = 0.0f;
+        s_friction_accel_l = 0.0f;
+        s_friction_accel_r = 0.0f;
+        s_friction_ff_initialized = 0U;
+        return;
+    }
+
+    // 首次启动只记录当前转速，不计算差分，避免产生启动瞬间的加速度尖峰。
+    if (!s_friction_ff_initialized)
+    {
+        s_friction_last_speed_l = speed_l;
+        s_friction_last_speed_r = speed_r;
+        s_friction_ff_initialized = 1U;
+        return;
+    }
+
+    // a = (n_current - n_last) / dt * 2π/60，结果单位为 rad/s²。
+    const float raw_accel_l = (speed_l - s_friction_last_speed_l) * RPM_TO_RAD_PER_SEC / FRICTION_FF_DT_S;
+    const float raw_accel_r = (speed_r - s_friction_last_speed_r) * RPM_TO_RAD_PER_SEC / FRICTION_FF_DT_S;
+
+    s_friction_last_speed_l = speed_l;
+    s_friction_last_speed_r = speed_r;
+    // 对差分得到的加速度进行低通滤波，降低编码器量化和反馈抖动的影响。
+    s_friction_accel_l += FRICTION_FF_ACCEL_ALPHA * (raw_accel_l - s_friction_accel_l);
+    s_friction_accel_r += FRICTION_FF_ACCEL_ALPHA * (raw_accel_r - s_friction_accel_r);
+
+    // 将两轮方向归一化后计算“左轮速度幅值 - 右轮速度幅值”。
+    // 左轮更快时 speed_diff > 0，同向叠加可减小左轮负向输出并增大右轮正向输出。
+    const float speed_diff = -speed_l - speed_r;
+    const float diff_ff = FRICTION_FF_C_DIFF * speed_diff;
+
+    // 总输出 = 速度 PID - 加速度前馈 + 转速差前馈。
+    const float output_l = xMotorParam[FRICTL].CurrentOutput -
+                           FRICTION_FF_GAIN * FRICTION_FF_C_ACC * s_friction_accel_l + diff_ff;
+    const float output_r = xMotorParam[FRICTR].CurrentOutput -
+                           FRICTION_FF_GAIN * FRICTION_FF_C_ACC * s_friction_accel_r + diff_ff;
+
+    xMotorParam[FRICTL].CurrentOutput = FrictionFeedforwardLimit(output_l);
+    xMotorParam[FRICTR].CurrentOutput = FrictionFeedforwardLimit(output_r);
+}
+
 /**********************************************************************************************************************
  * @Func	 void PidCalc(void)
  * @Brief   全电机PID计算
@@ -397,6 +480,7 @@ void PidCalc(void)
     MotorCalc(&xMotorParam[PITCH]);
     MotorCalc(&xMotorParam[FRICTR]);
     MotorCalc(&xMotorParam[FRICTL]);
+    FrictionFeedforwardCalc();
     MotorCalc(&xMotorParam[PLUCK]);
     MotorCalc(&xMotorParam[Height]);
 }
@@ -416,7 +500,7 @@ void TotalControlSetValue(void)
     }
     else if (Gimbal_Init_Flag)
     {
-        if (ABS(CH5) > 500 || highlow_flag != 0)
+        if ((ABS(CH5) > 500&&xRobotMode.CtrlMode == RC) || highlow_flag != 0)
         {
             LiftLowerControl(); // 云台升降限位控制，只有当遥控器拨杆在中位以上或者高低标志位不为0时才执行升降检测，升降检测导致的误触发问题
         }
