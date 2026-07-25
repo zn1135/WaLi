@@ -405,12 +405,17 @@ void MotorCanSendCurrent(void)
             {
                 if (xRobotMode.ChassisMode == CHASSIS_GYROSC)
                 {
-                    set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[YAW].ID, 0.0f, 0.0f, 0.0f, 0.0f, yaw_output + ((xMotorParam[WHEEL_FL].MeasureEco->speed_rpm + xMotorParam[WHEEL_FR].MeasureEco->speed_rpm + xMotorParam[WHEEL_BL].MeasureEco->speed_rpm + xMotorParam[WHEEL_BR].MeasureEco->speed_rpm) / 1.414 / 4 / 670) * 0.105f);
+                    float yaw_torque_cmd = yaw_output + ((xMotorParam[WHEEL_FL].MeasureEco->speed_rpm + xMotorParam[WHEEL_FR].MeasureEco->speed_rpm + xMotorParam[WHEEL_BL].MeasureEco->speed_rpm + xMotorParam[WHEEL_BR].MeasureEco->speed_rpm) / 1.414 / 4 / 670) * 0.105f;
+                    abs_limit(&yaw_torque_cmd, T_MAX);
+                    YawEsoRecordAppliedTorque(yaw_torque_cmd);
+                    set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[YAW].ID, 0.0f, 0.0f, 0.0f, 0.0f, yaw_torque_cmd);
                 }
                 else
                 {
-
-                    set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[YAW].ID, 0.0f, 0.0f, 0.0f, 0.0f, yaw_output);
+                    float yaw_torque_cmd = yaw_output;
+                    abs_limit(&yaw_torque_cmd, T_MAX);
+                    YawEsoRecordAppliedTorque(yaw_torque_cmd);
+                    set_DM_J4310_MIT_info(&hfdcan3, xMotorParam[YAW].ID, 0.0f, 0.0f, 0.0f, 0.0f, yaw_torque_cmd);
                 }
             }
             else

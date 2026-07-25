@@ -19,6 +19,115 @@
 #include "main.h"
 #include "user_lib.h"
 
+#ifndef GIMBAL_YAW_ESO_ENABLE
+#define GIMBAL_YAW_ESO_ENABLE 1
+#endif
+
+#define GIMBAL_YAW_ESO_BANDWIDTH 8.0f
+#define GIMBAL_YAW_ESO_COMP_GAIN 0.5f
+#define GIMBAL_YAW_ESO_COMP_LIMIT 1.5f
+#define GIMBAL_YAW_ESO_COMP_LPF_HZ 5.0f
+#define GIMBAL_YAW_ESO_DEFAULT_DT 0.006f
+#define GIMBAL_YAW_ESO_MIN_DT 0.0005f
+#define GIMBAL_YAW_ESO_MAX_DT 0.020f
+
+float yaw_eso_z1;
+float yaw_eso_z2;
+float yaw_eso_z3;
+float yaw_eso_comp_filt;
+volatile float yaw_eso_tau_applied;
+
+#if GIMBAL_YAW_ESO_ENABLE
+static float yaw_eso_last_timestamp_ms;
+static uint8_t yaw_eso_ready;
+static uint8_t yaw_eso_timestamp_ready;
+
+static void YawEsoReset(void)
+{
+    yaw_eso_z1 = 0.0f;
+    yaw_eso_z2 = 0.0f;
+    yaw_eso_z3 = 0.0f;
+    yaw_eso_comp_filt = 0.0f;
+    yaw_eso_tau_applied = 0.0f;
+    yaw_eso_last_timestamp_ms = 0.0f;
+    yaw_eso_ready = 0U;
+    yaw_eso_timestamp_ready = 0U;
+}
+
+static float YawEsoGetDt(void)
+{
+    const float now_ms = DWT_GetMonotonicTimestampMs();
+    float dt;
+
+    if (!yaw_eso_timestamp_ready)
+    {
+        yaw_eso_last_timestamp_ms = now_ms;
+        yaw_eso_timestamp_ready = 1U;
+        return GIMBAL_YAW_ESO_DEFAULT_DT;
+    }
+
+    dt = (now_ms - yaw_eso_last_timestamp_ms) * 0.001f;
+    yaw_eso_last_timestamp_ms = now_ms;
+    if (!(dt >= GIMBAL_YAW_ESO_MIN_DT && dt <= GIMBAL_YAW_ESO_MAX_DT))
+    {
+        dt = GIMBAL_YAW_ESO_DEFAULT_DT;
+    }
+    return dt;
+}
+
+static void YawEsoUpdate(float theta_measured, float tau_applied, float dt)
+{
+    const float w0 = GIMBAL_YAW_ESO_BANDWIDTH;
+    const float b0 = 1.0f / GIMBAL_YAW_J;
+    const float damping = GIMBAL_YAW_B / GIMBAL_YAW_J;
+    float error;
+
+    if (!yaw_eso_ready)
+    {
+        yaw_eso_z1 = theta_measured;
+        yaw_eso_z2 = 0.0f;
+        yaw_eso_z3 = 0.0f;
+        yaw_eso_comp_filt = 0.0f;
+        yaw_eso_ready = 1U;
+        return;
+    }
+
+    error = theta_measured - yaw_eso_z1;
+    yaw_eso_z1 += dt * (yaw_eso_z2 + 3.0f * w0 * error);
+    yaw_eso_z2 += dt * (-damping * yaw_eso_z2 + b0 * tau_applied +
+                         yaw_eso_z3 + 3.0f * w0 * w0 * error);
+    yaw_eso_z3 += dt * (w0 * w0 * w0 * error);
+
+    if (!isfinite(yaw_eso_z1) || !isfinite(yaw_eso_z2) || !isfinite(yaw_eso_z3))
+    {
+        YawEsoReset();
+    }
+}
+
+static float YawEsoCompensation(float dt)
+{
+    const float rc = 1.0f / (2.0f * PI * GIMBAL_YAW_ESO_COMP_LPF_HZ);
+    const float alpha = dt / (dt + rc);
+    float compensation;
+
+    if (!yaw_eso_ready)
+    {
+        return 0.0f;
+    }
+
+    compensation = -GIMBAL_YAW_ESO_COMP_GAIN * yaw_eso_z3 * GIMBAL_YAW_J;
+    yaw_eso_comp_filt += alpha * (compensation - yaw_eso_comp_filt);
+    compensation = yaw_eso_comp_filt;
+    abs_limit(&compensation, GIMBAL_YAW_ESO_COMP_LIMIT);
+    return compensation;
+}
+#endif
+
+void YawEsoRecordAppliedTorque(float torque)
+{
+    yaw_eso_tau_applied = torque;
+}
+
 float yaw_pos, yaw_acc, yaw_vel, yaw_output;
 float pitch_pos, pitch_acc, pitch_vel, pitch_output; // 自瞄控制参数，暂时没用到，后续可以根据需要调整
 float D_speed_yaw, gyrosc_speed;                     // 无用设计
@@ -77,6 +186,9 @@ void GimbalControlSetValue(void)
 {
 
     static int AngleSaveFlag = 1, AutoSaveAngle = 1;
+#if GIMBAL_YAW_ESO_ENABLE
+    uint8_t yaw_eso_active = 0U;
+#endif
     if (AngleSaveFlag)
     {
         AngleSaveFlag = 0;
@@ -161,6 +273,18 @@ void GimbalControlSetValue(void)
                 }
                 if (MiniPC_ReceivePacket.fireflag != 0)
                 {
+#if GIMBAL_YAW_ESO_ENABLE
+                    float yaw_eso_compensation = 0.0f;
+                    if (xMotorParam[YAW].MeasureDM->ERROR == 1)
+                    {
+                        const float yaw_eso_dt = YawEsoGetDt();
+                        yaw_eso_active = 1U;
+                        YawEsoUpdate(xMotorParam[YAW].MeasureImu->angle / 180.0f * PI,
+                                     yaw_eso_tau_applied,
+                                     yaw_eso_dt);
+                        yaw_eso_compensation = YawEsoCompensation(yaw_eso_dt);
+                    }
+#endif
 
                     AUTO_Shoot_flag = 2;
                     xMotorParam[PITCH].ImuTar = -MiniPC_ReceivePacket.pitch;
@@ -182,6 +306,9 @@ void GimbalControlSetValue(void)
                                  GIMBAL_YAW_FC * tanhf(MiniPC_ReceivePacket.yaw_vel / GIMBAL_YAW_FC_SMOOTH) +
                                  GIMBAL_YAW_TAU0 +
                                  Automatic_aiming_spd.pos_out;
+#if GIMBAL_YAW_ESO_ENABLE
+                    yaw_output += yaw_eso_compensation;
+#endif
                     abs_limit(&yaw_output, 10); // 限幅（现在是冗余设计）
 
                     /*记录角度标志位*/
@@ -365,6 +492,12 @@ void GimbalControlSetValue(void)
             }
         }
     }
+#if GIMBAL_YAW_ESO_ENABLE
+    if (!yaw_eso_active)
+    {
+        YawEsoReset();
+    }
+#endif
     xMotorParam[PITCH].EcoTar = AngleLimit(xMotorParam[PITCH].EcoTar, 0.34, -0.65);
     xMotorParam[PITCH].ImuTar = AngleLimit(xMotorParam[PITCH].ImuTar, 18, -37);
 }

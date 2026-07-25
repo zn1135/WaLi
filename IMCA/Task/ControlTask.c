@@ -276,22 +276,14 @@ void TotalControl(void)
     // yaw系统辨识帧。辨识完成后将GIMBAL_YAW_IDENT_ENABLE改回0即可恢复原VOFA帧。
 
     Vofa_Send_Data8(
- xMotorParam[PLUCK].MeasureEco->angle ,        // I0 实际发送力矩 (N*m)
-        xMotorParam[PLUCK].Timeout_Flag,          // I1 IMU总角度 (rad)
-        xMotorParam[PLUCK].EcoTar,     // I2 IMU角速度 (rad/s)
-        xMotorParam[PLUCK].CurrentOutput,       // I3 DWT单调时间戳 (ms)
-        xMotorParam[PLUCK].MeasureEco->real_current,        // I4 限幅/斜坡后的请求力矩 (N*m)
-        Stuck_Bullet_falg, // I5 相对起点角度 (rad)
-        xMotorParam[PITCH].EcoTar ,     // I6 1=有效辨识样本
-         xMotorParam[PITCH].MeasureDM->position       // I7 本拍真实dt (ms)
-        // xMotorParam[FRICTL].MeasureEco->speed_rpm,//
-        // xMotorParam[FRICTR].MeasureEco->speed_rpm,//
-        // 0,
-        // 0,
-        // 0,
-        // 0,
-        // 0,
-        // 0
+        yaw_eso_z1,
+        yaw_eso_z2,
+        yaw_eso_z3,
+        yaw_eso_comp_filt,
+        MiniPC_ReceivePacket.yaw,
+        MiniPC_ReceivePacket.yaw_vel,
+        xMotorParam[YAW].MeasureImu->angle/ 180 * PI,
+        xMotorParam[YAW].MeasureImu->palstance/ 180 * PI
     );
 
     // Vofa_Send_Data16(xMotorParam[WHEEL_FR].MeasureEco->speed_rpm,//0

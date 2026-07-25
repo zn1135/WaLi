@@ -125,7 +125,7 @@ void PidInit(void)
 {
     PID_struct_init(&Chassis_Power, POSITION_PID, 1.0f, 0.0, 0.025f, 0.000f, 0.0f);
 
-    PID_struct_init(&Automatic_aiming_pos, POSITION_PID, 10, 0.8,  LQR_AUTO_K_THETA_DEFAULT, 0.000f, 0.00f);
+    PID_struct_init(&Automatic_aiming_pos, POSITION_PID, 10, 0.8,  LQR_AUTO_K_THETA_DEFAULT, 0.08f, 0.00f);
     PID_struct_init(&Automatic_aiming_spd, POSITION_PID, 10, 1, LQR_AUTO_K_OMEGA_DEFAULT, 0.00f, 0.0f);
 
     PID_struct_init(&Chassis_Rotate, POSITION_PID, 5000, 100, 150.0f, 0.2f, 0.0f);
